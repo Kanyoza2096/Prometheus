@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 import { StatCard, LiveStream, HealthMatrix, RevenueTicker, RecentPostsWidget, GuardianAlertsWidget } from '../components/DashboardWidgets';
 import SystemTopology from '../components/SystemTopology';
 import { ResourceRadar, TrafficComposedChart } from '../components/ResourceUtilization';
+import BackendStatusCard from '../components/BackendStatusCard';
 import { MessageSquare, FileText, Users, Zap, ShieldAlert } from 'lucide-react';
 
 const sparklineDataGen = () => Array.from({ length: 10 }, () => ({ value: Math.random() * 100 }));
@@ -59,7 +60,8 @@ export default function Dashboard() {
         <div className="lg:col-span-2">
           <SystemTopology />
         </div>
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 flex flex-col gap-6">
+          <BackendStatusCard />
           <ResourceRadar />
         </div>
       </div>

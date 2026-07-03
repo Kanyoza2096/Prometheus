@@ -1,0 +1,120 @@
+M
+My Workspace
+
+
+k
+My project
+
+Production
+
+Kanyoza-systems-Bot
+
+Your free instance will spin down with inactivity, which can delay requests by 50 seconds or more.
+Upgrade now
+Live logs are unavailable after an instance fails. View recent events.
+
+Application logs
+Search
+Search logs
+
+Live tail
+
+
+
+
+40+ new logs
+{"ts": "2026-07-03T19:26:18.796170+00:00", "level": "INFO", "module": "kanyoza.bootstrap", "correlation_id": null, "msg": "Log level   : INFO", "levelno": 20}
+{"ts": "2026-07-03T19:26:18.796260+00:00", "level": "INFO", "module": "kanyoza.bootstrap", "correlation_id": null, "msg": "Validating configuration...", "levelno": 20}
+{"ts": "2026-07-03T19:26:18.796356+00:00", "level": "INFO", "module": "kanyoza.bootstrap", "correlation_id": null, "msg": "Config OK  (gemini=True  facebook=True  supabase=True)", "levelno": 20}
+{"ts": "2026-07-03T19:26:18.796435+00:00", "level": "INFO", "module": "kanyoza.bootstrap", "correlation_id": null, "msg": "Building service container...", "levelno": 20}
+{"ts": "2026-07-03T19:26:21.305579+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "Supabase client registered.", "levelno": 20}
+{"ts": "2026-07-03T19:26:21.398674+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "Repositories registered.", "levelno": 20}
+{"ts": "2026-07-03T19:26:21.493711+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "BrowserManager registered (module singleton).", "levelno": 20}
+{"ts": "2026-07-03T19:26:21.497403+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "RenderCache registered (module singleton).", "levelno": 20}
+{"ts": "2026-07-03T19:26:21.508900+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "PostPublishWorkflow registered.", "levelno": 20}
+{"ts": "2026-07-03T19:26:21.509044+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "Service container built \u2014 15 bindings registered.", "levelno": 20}
+{"ts": "2026-07-03T19:26:21.509129+00:00", "level": "INFO", "module": "kanyoza.bootstrap", "correlation_id": null, "msg": "Creating Flask application...", "levelno": 20}
+{"ts": "2026-07-03T19:26:29.091912+00:00", "level": "INFO", "module": "kanyoza.factory", "correlation_id": null, "msg": "Webhook routes registered", "levelno": 20}
+{"ts": "2026-07-03T19:26:29.116761+00:00", "level": "INFO", "module": "kanyoza.factory", "correlation_id": null, "msg": "Converter API registered at /api/v1", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.694834+00:00", "level": "INFO", "module": "kanyoza.socket", "correlation_id": null, "msg": "SocketIO initialised (async_mode=eventlet, namespace=/dashboard)", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.703985+00:00", "level": "INFO", "module": "kanyoza.factory", "correlation_id": null, "msg": "Dashboard API registered at /api/v1/dashboard", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.891996+00:00", "level": "INFO", "module": "kanyoza.factory", "correlation_id": null, "msg": "API v1 Blueprint registered at /api/v1/*", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.892411+00:00", "level": "INFO", "module": "kanyoza.factory", "correlation_id": null, "msg": "Flask application created (env=production)", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.892502+00:00", "level": "INFO", "module": "kanyoza.bootstrap", "correlation_id": null, "msg": "Registering lifecycle hooks...", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.896077+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "EventBus created.", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.896161+00:00", "level": "INFO", "module": "kanyoza.lifecycle", "correlation_id": null, "msg": "EventBus ready.", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.896670+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "TaskQueue started with 3 workers.", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.896755+00:00", "level": "INFO", "module": "kanyoza.lifecycle", "correlation_id": null, "msg": "TaskQueue ready.", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.990454+00:00", "level": "INFO", "module": "kanyoza.lifecycle", "correlation_id": null, "msg": "PluginRegistry ready.", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.990672+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "EventRecorder started.", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.990774+00:00", "level": "INFO", "module": "kanyoza.lifecycle", "correlation_id": null, "msg": "EventRecorder ready.", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.997058+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "AIOrchestrator created with 2 provider(s).", "levelno": 20}
+{"ts": "2026-07-03T19:26:32.997298+00:00", "level": "INFO", "module": "kanyoza.lifecycle", "correlation_id": null, "msg": "AIOrchestrator ready. Available providers: ['gemini']", "levelno": 20}
+==> Detected new open ports UDP:36804, UDP:38748, UDP:41690, UDP:43650, UDP:46632
+{"ts": "2026-07-03T19:26:41.393051+00:00", "level": "INFO", "module": "kanyoza.services.browser_manager", "correlation_id": null, "msg": "BrowserManager started \u2014 1 pages ready (Chromium 149.0.7827.55).", "levelno": 20}
+{"ts": "2026-07-03T19:26:41.393186+00:00", "level": "INFO", "module": "kanyoza.lifecycle", "correlation_id": null, "msg": "BrowserManager ready (page pool started).", "levelno": 20}
+{"ts": "2026-07-03T19:26:41.393336+00:00", "level": "INFO", "module": "kanyoza.lifecycle", "correlation_id": null, "msg": "SocketIO event bridge wired \u2014 7 EventBus subscriptions active.", "levelno": 20}
+{"ts": "2026-07-03T19:26:41.596810+00:00", "level": "INFO", "module": "kanyoza.registry", "correlation_id": null, "msg": "Supabase client created.", "levelno": 20}
+{"ts": "2026-07-03T19:26:41.596956+00:00", "level": "INFO", "module": "kanyoza.lifecycle", "correlation_id": null, "msg": "PostPublishWorkflow wired into scheduler.", "levelno": 20}
+{"ts": "2026-07-03T19:26:41.597431+00:00", "level": "INFO", "module": "kanyoza.scheduler", "correlation_id": null, "msg": "Scheduler started. Content slots (UTC): [1, 3, 5, 7, 9, 11, 13, 15, 17, 19]  (10 posts/day)", "levelno": 20}
+{"ts": "2026-07-03T19:26:41.597523+00:00", "level": "INFO", "module": "kanyoza.lifecycle", "correlation_id": null, "msg": "Post scheduler started.", "levelno": 20}
+{"ts": "2026-07-03T19:26:41.597647+00:00", "level": "INFO", "module": "kanyoza.lifecycle", "correlation_id": null, "msg": "Lifecycle hooks registered.", "levelno": 20}
+{"ts": "2026-07-03T19:26:41.597727+00:00", "level": "INFO", "module": "kanyoza.bootstrap", "correlation_id": null, "msg": "Bootstrap complete \u2014 application ready.", "levelno": 20}
+[2026-07-03 19:26:41 +0000] [40] [INFO] Starting gunicorn 23.0.0
+[2026-07-03 19:26:41 +0000] [40] [INFO] Listening at: http://0.0.0.0:10000 (40)
+[2026-07-03 19:26:41 +0000] [40] [INFO] Using worker: sync
+[2026-07-03 19:26:41 +0000] [132] [INFO] Booting worker with pid: 132
+127.0.0.1 - - [03/Jul/2026:19:26:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "Go-http-client/1.1"
+{"ts": "2026-07-03T19:27:11.598539+00:00", "level": "INFO", "module": "kanyoza.scheduler", "correlation_id": null, "msg": "Scheduled content post enqueued for slot UTC 19:xx (2026-07-03)", "levelno": 20}
+{"ts": "2026-07-03T19:27:11.598592+00:00", "level": "INFO", "module": "kanyoza.scheduler", "correlation_id": null, "msg": "Scheduled content post enqueued for slot UTC 19:xx (2026-07-03)", "levelno": 20}
+{"ts": "2026-07-03T19:27:11.606760+00:00", "level": "INFO", "module": "kanyoza.services.content_engine", "correlation_id": null, "msg": "Pipeline start: category='gadgets_tech'  topic='AirPods Pro vs Sony WH-1000XM5'  theme='comparison'", "levelno": 20}
+{"ts": "2026-07-03T19:27:11.606760+00:00", "level": "INFO", "module": "kanyoza.services.content_engine", "correlation_id": null, "msg": "Pipeline start: category='system_architecture'  topic='Mobile CI/CD: Fastlane vs Bitrise'  theme='architecture'", "levelno": 20}
+{"ts": "2026-07-03T19:27:12.020793+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": null, "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (414 ms)", "levelno": 30}
+{"ts": "2026-07-03T19:27:12.021010+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": null, "msg": "[gemini] HTTP 429 \u2014 retrying in 1.0s (attempt 1/2)", "levelno": 30}
+{"ts": "2026-07-03T19:27:13.119618+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": null, "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (97 ms) [retry 1]", "levelno": 30}
+{"ts": "2026-07-03T19:27:13.119785+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": null, "msg": "[gemini] HTTP 429 \u2014 retrying in 2.0s (attempt 2/2)", "levelno": 30}
+{"ts": "2026-07-03T19:27:14.306709+00:00", "level": "INFO", "module": "kanyoza.services.content_engine", "correlation_id": null, "msg": "TechPost parsed: is_debate=True", "levelno": 20}
+{"ts": "2026-07-03T19:27:14.323096+00:00", "level": "INFO", "module": "kanyoza.services.card_renderer", "correlation_id": null, "msg": "Jinja2 card environment ready (/opt/render/project/src/templates/cards)", "levelno": 20}
+Exception in callback <_asyncio.TaskStepMethWrapper object at 0x78f10b3c7520>()
+handle: <Handle <_asyncio.TaskStepMethWrapper object at 0x78f10b3c7520>()>
+Traceback (most recent call last):
+  File "/opt/render/project/python/Python-3.14.3/lib/python3.14/asyncio/events.py", line 94, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: loop <_UnixSelectorEventLoop running=True closed=False debug=False> is not the running loop
+Exception in callback Task.task_wakeup()
+handle: <Handle Task.task_wakeup()>
+Traceback (most recent call last):
+  File "/opt/render/project/python/Python-3.14.3/lib/python3.14/asyncio/events.py", line 94, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: loop <_UnixSelectorEventLoop running=True closed=False debug=False> is not the running loop
+{"ts": "2026-07-03T19:27:15.228716+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": null, "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (108 ms) [retry 2]", "levelno": 30}
+{"ts": "2026-07-03T19:27:15.228912+00:00", "level": "WARNING", "module": "kanyoza.services.gemini", "correlation_id": null, "msg": "generate_structured_post failed: Rate limited", "levelno": 30}
+{"ts": "2026-07-03T19:27:15.229252+00:00", "level": "ERROR", "module": "kanyoza.services.content_engine", "correlation_id": null, "msg": "Post generation crashed: Rate limited", "levelno": 40}
+{"ts": "2026-07-03T19:27:18.105804+00:00", "level": "INFO", "module": "kanyoza.services.supabase", "correlation_id": null, "msg": "Supabase service client connected (admin): https://kfgutijhrywnxpsjjacd.supabase.co", "levelno": 20}
+AnalyticsRepository._safe_call: {'message': "Could not find the 'event' column of 'analytics_events' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Traceback (most recent call last):
+  File "/opt/render/project/src/repositories/base.py", line 28, in _safe_call
+    return fn(*args, **kwargs)
+  File "/opt/render/project/src/repositories/analytics_repository.py", line 47, in <lambda>
+    self._safe_call(lambda: client.table(self.TABLE).insert(entity).execute())
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/postgrest/_sync/request_builder.py", line 78, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': "Could not find the 'event' column of 'analytics_events' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+AnalyticsRepository._safe_call: {'message': "Could not find the 'event' column of 'analytics_events' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Traceback (most recent call last):
+  File "/opt/render/project/src/repositories/base.py", line 28, in _safe_call
+    return fn(*args, **kwargs)
+  File "/opt/render/project/src/repositories/analytics_repository.py", line 47, in <lambda>
+    self._safe_call(lambda: client.table(self.TABLE).insert(entity).execute())
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/postgrest/_sync/request_builder.py", line 78, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': "Could not find the 'event' column of 'analytics_events' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+{"ts": "2026-07-03T19:27:19.152071+00:00", "level": "INFO", "module": "kanyoza.scheduler", "correlation_id": null, "msg": "PostPublishWorkflow completed successfully (7164ms)", "levelno": 20}
+0 services selected:
+
+Move
+
