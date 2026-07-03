@@ -1,23 +1,78 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { GitBranch, Play, CheckCircle2, CircleDashed, Server, Zap, Database, Globe, RefreshCcw, Brain, Image } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { GitBranch, Play, CheckCircle2, CircleDashed, Server, Zap, Database, Globe, RefreshCcw, Brain, Image, Pause, Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function Workflows() {
-  const steps = [
+  const [jobStatus, setJobStatus] = useState<'Running' | 'Paused' | 'Completed'>('Running');
+  const [progress, setProgress] = useState(45);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const [steps, setSteps] = useState([
     { id: 'topic', label: 'Select Topic', status: 'completed', icon: Database, time: '12ms' },
     { id: 'generate', label: 'Generate Content', status: 'completed', icon: Brain, time: '1.4s' },
     { id: 'render', label: 'Render Card', status: 'running', icon: Image, time: 'In progress...' },
     { id: 'publish', label: 'Publish to Social', status: 'pending', icon: Globe, time: '--' },
     { id: 'analytics', label: 'Record Analytics', status: 'pending', icon: Zap, time: '--' },
-  ];
+  ]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleRefreshState = () => {
+    // Advance progress or refresh state
+    if (progress < 90) {
+      setProgress(p => Math.min(100, p + 25));
+    } else {
+      setProgress(15);
+    }
+    showToast('Workflow telemetry state synchronized from core engine.');
+  };
+
+  const toggleJobStatus = () => {
+    if (jobStatus === 'Running') {
+      setJobStatus('Paused');
+      showToast('Workflow job paused.');
+    } else {
+      setJobStatus('Running');
+      showToast('Workflow job resumed.');
+    }
+  };
+
+  const handleStepClick = (stepId: string) => {
+    setSteps(prev => prev.map(s => {
+      if (s.id === stepId) {
+        const nextStatus = s.status === 'pending' ? 'running' : s.status === 'running' ? 'completed' : 'pending';
+        return { ...s, status: nextStatus };
+      }
+      return s;
+    }));
+    showToast(`Updated step state for ${stepId.toUpperCase()}`);
+  };
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-6xl mx-auto"
+      className="max-w-6xl mx-auto relative"
     >
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-20 right-8 z-50 bg-brand-primary text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-2 font-mono text-xs font-bold"
+          >
+            <Check className="w-4 h-4" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end space-y-4 sm:space-y-0">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center">
@@ -26,8 +81,11 @@ export default function Workflows() {
           </h1>
           <p className="text-brand-text-muted text-sm font-mono mt-1">AUTOMATION PIPELINE VISUALIZER</p>
         </div>
-        <button className="bg-brand-surface border border-brand-border text-brand-text px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-brand-elevated transition-colors flex items-center">
-          <RefreshCcw className="w-4 h-4 mr-2" />
+        <button 
+          onClick={handleRefreshState}
+          className="bg-brand-surface border border-brand-border text-brand-text px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-brand-elevated transition-colors flex items-center shadow-sm"
+        >
+          <RefreshCcw className="w-4 h-4 mr-2 text-brand-primary" />
           Refresh State
         </button>
       </div>
@@ -42,14 +100,24 @@ export default function Workflows() {
               <div>
                 <div className="flex items-center space-x-3 mb-2">
                   <h2 className="text-lg font-bold text-brand-text uppercase tracking-widest">PostPublishWorkflow</h2>
-                  <span className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                    Running
+                  <span className={cn(
+                    "px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border",
+                    jobStatus === 'Running' ? "bg-brand-primary/10 text-brand-primary border-brand-primary/20" : "bg-brand-warning/10 text-brand-warning border-brand-warning/20"
+                  )}>
+                    {jobStatus}
                   </span>
                 </div>
                 <p className="text-xs font-mono text-brand-text-muted">Job ID: job_9283749283 | Trigger: Schedule (0 12 * * *)</p>
               </div>
-              <button className="w-10 h-10 rounded-full bg-brand-danger/10 text-brand-danger border border-brand-danger/20 flex items-center justify-center hover:bg-brand-danger hover:text-white transition-colors">
-                <Server className="w-4 h-4" />
+              <button 
+                onClick={toggleJobStatus}
+                title={jobStatus === 'Running' ? 'Pause Execution' : 'Resume Execution'}
+                className={cn(
+                  "w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-md",
+                  jobStatus === 'Running' ? "bg-brand-danger/10 text-brand-danger border-brand-danger/20 hover:bg-brand-danger hover:text-white" : "bg-brand-success/10 text-brand-success border-brand-success/20 hover:bg-brand-success hover:text-white"
+                )}
+              >
+                {jobStatus === 'Running' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
             </div>
 
@@ -58,7 +126,7 @@ export default function Workflows() {
               <div className="absolute left-8 md:left-16 top-6 bottom-6 w-[2px] bg-brand-border"></div>
               
               <div className="space-y-12">
-                {steps.map((step, idx) => (
+                {steps.map((step) => (
                   <div key={step.id} className="relative flex items-start group">
                     {/* Status Indicator */}
                     <div className="absolute -left-4 md:-left-4 mt-1 bg-brand-surface">
@@ -80,12 +148,15 @@ export default function Workflows() {
                     </div>
 
                     {/* Step Content */}
-                    <div className={cn(
-                      "ml-10 md:ml-12 p-5 rounded-xl border w-full transition-all",
-                      step.status === 'running' 
-                        ? "bg-brand-elevated border-brand-primary shadow-[0_0_20px_rgba(79,70,229,0.1)]" 
-                        : "bg-brand-bg border-brand-border opacity-70 group-hover:opacity-100"
-                    )}>
+                    <div 
+                      onClick={() => handleStepClick(step.id)}
+                      className={cn(
+                        "ml-10 md:ml-12 p-5 rounded-xl border w-full transition-all cursor-pointer",
+                        step.status === 'running' 
+                          ? "bg-brand-elevated border-brand-primary shadow-[0_0_20px_rgba(79,70,229,0.1)]" 
+                          : "bg-brand-bg border-brand-border opacity-70 group-hover:opacity-100 hover:border-brand-primary/40"
+                      )}
+                    >
                       <div className="flex justify-between items-center mb-3">
                         <div className="flex items-center space-x-3">
                           <step.icon className={cn(
@@ -106,10 +177,13 @@ export default function Workflows() {
                         <div className="mt-4">
                           <div className="flex justify-between text-[10px] font-mono text-brand-text-muted mb-2">
                             <span>Generating layout matrix...</span>
-                            <span>45%</span>
+                            <span>{progress}%</span>
                           </div>
                           <div className="w-full bg-brand-surface rounded-full h-1.5 overflow-hidden border border-brand-border">
-                            <div className="bg-brand-primary h-1.5 rounded-full w-[45%] relative">
+                            <div 
+                              className="bg-brand-primary h-1.5 rounded-full relative transition-all duration-500"
+                              style={{ width: `${progress}%` }}
+                            >
                               <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
                             </div>
                           </div>

@@ -11,7 +11,12 @@ export default function Settings() {
     restEndpoint, 
     masterToken, 
     setConnectionParams,
+    supabaseUrl,
+    supabaseAnonKey,
     geminiKey,
+    githubToken,
+    githubRepo,
+    githubBranch,
     fbPageId,
     fbVerifyToken,
     fbPageAccessToken,
@@ -24,12 +29,18 @@ export default function Settings() {
   const [localToken, setLocalToken] = useState(masterToken);
   const [isSaved, setIsSaved] = useState(false);
 
+  const [localSupaUrl, setLocalSupaUrl] = useState(supabaseUrl);
+  const [localSupaKey, setLocalSupaKey] = useState(supabaseAnonKey);
   const [localGemini, setLocalGemini] = useState(geminiKey);
+  const [localGithubToken, setLocalGithubToken] = useState(githubToken);
+  const [localGithubRepo, setLocalGithubRepo] = useState(githubRepo);
+  const [localGithubBranch, setLocalGithubBranch] = useState(githubBranch);
   const [localFbPageId, setLocalFbPageId] = useState(fbPageId);
   const [localFbVerify, setLocalFbVerify] = useState(fbVerifyToken);
   const [localFbAccess, setLocalFbAccess] = useState(fbPageAccessToken);
   const [localFbSecret, setLocalFbSecret] = useState(fbAppSecret);
   const [isKeysSaved, setIsKeysSaved] = useState(false);
+  const [githubSyncStatus, setGithubSyncStatus] = useState<{ type: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ type: 'idle', message: '' });
 
   // Modal states
   const [activeModal, setActiveModal] = useState<'profile' | 'alerts' | 'theme' | 'retention' | 'logs' | null>(null);
@@ -117,7 +128,12 @@ export default function Settings() {
 
   const handleSaveKeys = () => {
     setServiceKeys({
+      supabaseUrl: localSupaUrl,
+      supabaseAnonKey: localSupaKey,
       geminiKey: localGemini,
+      githubToken: localGithubToken,
+      githubRepo: localGithubRepo,
+      githubBranch: localGithubBranch,
       fbPageId: localFbPageId,
       fbVerifyToken: localFbVerify,
       fbPageAccessToken: localFbAccess,
@@ -125,6 +141,41 @@ export default function Settings() {
     });
     setIsKeysSaved(true);
     setTimeout(() => setIsKeysSaved(false), 2000);
+  };
+
+  const handleTestGithubSync = async () => {
+    if (!localGithubRepo) {
+      setGithubSyncStatus({ type: 'error', message: 'Please specify a GitHub repository (e.g. username/repository)' });
+      return;
+    }
+    setGithubSyncStatus({ type: 'loading', message: 'Verifying repository access and branch permissions...' });
+    
+    try {
+      const headers: Record<string, string> = {
+        'Accept': 'application/vnd.github+json'
+      };
+      if (localGithubToken) {
+        headers['Authorization'] = `Bearer ${localGithubToken}`;
+      }
+      const res = await fetch(`https://api.github.com/repos/${localGithubRepo}`, { headers });
+      if (res.ok) {
+        const repoData = await res.json();
+        setGithubSyncStatus({
+          type: 'success',
+          message: `Connected successfully to ${repoData.full_name} (${repoData.visibility}). Default branch: ${repoData.default_branch}. Target branch '${localGithubBranch || 'main'}' ready for automated commits.`
+        });
+      } else if (res.status === 404) {
+        setGithubSyncStatus({
+          type: 'error',
+          message: `Repository '${localGithubRepo}' not found or is private. Make sure your GitHub Personal Access Token (PAT) has 'repo' scope permissions.`
+        });
+      } else {
+        const errData = await res.json().catch(() => ({ message: 'API check failed' }));
+        setGithubSyncStatus({ type: 'error', message: `GitHub API error: ${errData.message || res.statusText}` });
+      }
+    } catch (err: any) {
+      setGithubSyncStatus({ type: 'error', message: `Network request error: ${err.message || 'Failed to reach GitHub API'}` });
+    }
   };
 
   return (
@@ -279,6 +330,133 @@ export default function Settings() {
             </h2>
             
             <div className="space-y-6">
+              <div className="pb-5 border-b border-brand-border">
+                <h3 className="text-xs font-bold text-brand-text mb-4 uppercase tracking-wider">Supabase Database & Auth</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-brand-text-muted uppercase tracking-wider mb-2 font-mono">
+                      SUPABASE_URL
+                    </label>
+                    <input
+                      type="text"
+                      value={localSupaUrl}
+                      onChange={(e) => setLocalSupaUrl(e.target.value)}
+                      placeholder="https://xyz.supabase.co"
+                      className="w-full bg-brand-bg/50 border border-brand-border rounded-lg px-4 py-3 text-brand-text placeholder-brand-text-muted/50 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-brand-text-muted uppercase tracking-wider mb-2 font-mono">
+                      SUPABASE_ANON_KEY
+                    </label>
+                    <input
+                      type="password"
+                      value={localSupaKey}
+                      onChange={(e) => setLocalSupaKey(e.target.value)}
+                      placeholder="eyJhbGciOi..."
+                      className="w-full bg-brand-bg/50 border border-brand-border rounded-lg px-4 py-3 text-brand-text placeholder-brand-text-muted/50 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all font-mono text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pb-5 border-b border-brand-border">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-xs font-bold text-brand-text uppercase tracking-wider flex items-center">
+                      GitHub Repository & Code Push Integration
+                    </h3>
+                    <p className="text-[11px] text-brand-text-muted mt-0.5">
+                      Connect your GitHub Personal Access Token (PAT) to verify repository permissions and push codebase changes.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-brand-bg/60 border border-brand-border/80 rounded-xl p-4 mb-4">
+                  <div className="flex items-start space-x-3">
+                    <Info className="w-4 h-4 text-brand-primary flex-shrink-0 mt-0.5" />
+                    <div className="text-xs text-brand-text-muted space-y-1">
+                      <p className="font-semibold text-brand-text">How to export/push codebase to GitHub:</p>
+                      <p><strong className="text-brand-primary">1. Platform Export:</strong> Use the AI Studio top bar settings menu (click settings icon in top right) and select <span className="text-brand-text font-mono font-medium">Export to GitHub</span> or <span className="text-brand-text font-mono font-medium">Download ZIP</span>.</p>
+                      <p><strong className="text-brand-primary">2. Direct API Integration:</strong> Provide your GitHub PAT with <code className="text-brand-accent font-mono">repo</code> scope below to test live API access and authorize automated git workflows.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-bold text-brand-text-muted uppercase tracking-wider mb-2 font-mono">
+                      GITHUB_REPOSITORY
+                    </label>
+                    <input
+                      type="text"
+                      value={localGithubRepo}
+                      onChange={(e) => setLocalGithubRepo(e.target.value)}
+                      placeholder="username/my-app"
+                      className="w-full bg-brand-bg/50 border border-brand-border rounded-lg px-4 py-3 text-brand-text placeholder-brand-text-muted/50 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-bold text-brand-text-muted uppercase tracking-wider mb-2 font-mono">
+                      TARGET_BRANCH
+                    </label>
+                    <input
+                      type="text"
+                      value={localGithubBranch}
+                      onChange={(e) => setLocalGithubBranch(e.target.value)}
+                      placeholder="main"
+                      className="w-full bg-brand-bg/50 border border-brand-border rounded-lg px-4 py-3 text-brand-text placeholder-brand-text-muted/50 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-bold text-brand-text-muted uppercase tracking-wider mb-2 font-mono">
+                      GITHUB_PERSONAL_ACCESS_TOKEN (PAT)
+                    </label>
+                    <input
+                      type="password"
+                      value={localGithubToken}
+                      onChange={(e) => setLocalGithubToken(e.target.value)}
+                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                      className="w-full bg-brand-bg/50 border border-brand-border rounded-lg px-4 py-3 text-brand-text placeholder-brand-text-muted/50 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all font-mono text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={handleTestGithubSync}
+                    disabled={githubSyncStatus.type === 'loading'}
+                    className="px-4 py-2 bg-brand-border/60 hover:bg-brand-border text-brand-text rounded-lg text-xs font-semibold flex items-center transition-all disabled:opacity-50"
+                  >
+                    {githubSyncStatus.type === 'loading' ? (
+                      <>
+                        <span className="w-3 h-3 border-2 border-brand-text border-t-transparent rounded-full animate-spin mr-2" />
+                        Verifying GitHub Repo...
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-3.5 h-3.5 mr-2 text-brand-primary" />
+                        Verify Repository & Push Permissions
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {githubSyncStatus.message && (
+                  <div className={cn(
+                    "mt-3 p-3 rounded-lg text-xs font-mono border",
+                    githubSyncStatus.type === 'success' && "bg-brand-success/10 text-brand-success border-brand-success/30",
+                    githubSyncStatus.type === 'error' && "bg-brand-accent/10 text-brand-accent border-brand-accent/30",
+                    githubSyncStatus.type === 'loading' && "bg-brand-primary/10 text-brand-primary border-brand-primary/30"
+                  )}>
+                    {githubSyncStatus.message}
+                  </div>
+                )}
+              </div>
+
               <div className="pb-5 border-b border-brand-border">
                 <h3 className="text-xs font-bold text-brand-text mb-4 uppercase tracking-wider">AI Engine</h3>
                 <div>

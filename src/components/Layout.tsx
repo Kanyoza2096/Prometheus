@@ -25,9 +25,12 @@ import CommandPalette from './CommandPalette';
 import { supabase } from '../lib/supabase';
 
 export default function Layout() {
-  const { logout, socketConnected, connectSocket, disconnectSocket, guardianAlerts, toggleTerminal, setPendingCommand, fetchInitialData } = useStore();
+  const { logout, socketConnected, connectSocket, disconnectSocket, guardianAlerts, toggleTerminal, setPendingCommand, fetchInitialData, isUsingLiveBackendData } = useStore();
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFabOpen, setIsFabOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -52,6 +55,16 @@ export default function Layout() {
     await supabase.auth.signOut();
     logout();
     navigate('/');
+  };
+
+  const handleFabCommand = (cmd: string, path?: string) => {
+    setPendingCommand(cmd);
+    if (!useStore.getState().isTerminalOpen) {
+      toggleTerminal();
+    }
+    if (path) {
+      navigate(path);
+    }
   };
 
   const unreadAlerts = guardianAlerts.filter(a => a.severity === 'CRITICAL').length;
@@ -127,28 +140,141 @@ export default function Layout() {
       <main className="flex-1 flex flex-col md:h-screen h-[calc(100vh-3.5rem)] overflow-hidden relative">
         {/* Top Bar */}
         <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 bg-brand-surface/50 backdrop-blur-md border-b border-brand-border hidden md:flex z-30">
-          <div className="text-sm font-mono text-brand-text-muted">
-            <span className="text-brand-primary mr-2">SYS_TIME:</span>
-            {new Date().toISOString().replace('T', ' ').substring(0, 19)} UTC
+          <div className="flex items-center space-x-4 text-xs font-mono">
+            <div className="text-brand-text-muted">
+              <span className="text-brand-primary mr-2">SYS_TIME:</span>
+              {new Date().toISOString().replace('T', ' ').substring(0, 19)} UTC
+            </div>
+            <div className={cn(
+              "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center border",
+              isUsingLiveBackendData 
+                ? "bg-brand-success/10 text-brand-success border-brand-success/30" 
+                : "bg-brand-accent/10 text-brand-accent border-brand-accent/30"
+            )}>
+              <span className={cn("w-1.5 h-1.5 rounded-full mr-1.5", isUsingLiveBackendData ? "bg-brand-success animate-pulse" : "bg-brand-accent")} />
+              {isUsingLiveBackendData ? "Live Database Active" : "Fallback Mock Data (API / DB Unreachable)"}
+            </div>
           </div>
           
           <div className="flex items-center space-x-6">
             <div className="relative">
-              <Bell className="w-5 h-5 text-brand-text-muted hover:text-brand-text cursor-pointer transition-colors" />
-              {unreadAlerts > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-brand-danger rounded-full flex items-center justify-center text-[9px] font-bold shadow-glow-danger">
-                  {unreadAlerts}
-                </span>
-              )}
+              <button 
+                onClick={() => {
+                  setIsNotificationsOpen(!isNotificationsOpen);
+                  setIsAdminMenuOpen(false);
+                }}
+                className="p-1 rounded-lg hover:bg-brand-elevated transition-colors relative"
+              >
+                <Bell className="w-5 h-5 text-brand-text-muted hover:text-brand-text transition-colors" />
+                {unreadAlerts > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-brand-danger rounded-full flex items-center justify-center text-[9px] font-bold shadow-glow-danger text-white">
+                    {unreadAlerts}
+                  </span>
+                )}
+              </button>
+
+              {/* Notifications Dropdown Panel */}
+              <AnimatePresence>
+                {isNotificationsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-3 w-80 bg-brand-surface border border-brand-border rounded-2xl shadow-2xl p-4 z-50"
+                  >
+                    <div className="flex justify-between items-center pb-3 border-b border-brand-border mb-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-brand-text">System Alerts</h3>
+                      <span className="text-[10px] font-mono bg-brand-primary/20 text-brand-primary px-2 py-0.5 rounded">
+                        {guardianAlerts.length} total
+                      </span>
+                    </div>
+                    <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                      {guardianAlerts.slice(0, 5).map(alert => (
+                        <div 
+                          key={alert.id}
+                          onClick={() => {
+                            navigate('/guardian');
+                            setIsNotificationsOpen(false);
+                          }}
+                          className="p-2.5 bg-brand-bg hover:bg-brand-elevated rounded-xl border border-brand-border/60 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={cn(
+                              "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded",
+                              alert.severity === 'CRITICAL' ? "bg-brand-danger/20 text-brand-danger" : "bg-brand-warning/20 text-brand-warning"
+                            )}>
+                              {alert.severity}
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold truncate text-brand-text">{alert.title}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigate('/guardian');
+                        setIsNotificationsOpen(false);
+                      }}
+                      className="w-full mt-3 py-2 text-center text-xs font-bold text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-colors border border-brand-primary/20 uppercase"
+                    >
+                      View All Logs in Guardian
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            <div className="flex items-center space-x-3 border-l border-brand-border pl-6">
-              <div className="w-8 h-8 rounded-full bg-brand-elevated border border-brand-border flex items-center justify-center overflow-hidden">
-                <img src="https://ui-avatars.com/api/?name=Admin&background=4F46E5&color=fff" alt="Admin" />
-              </div>
-              <div className="text-sm">
-                <p className="font-bold leading-none">Admin Alpha</p>
-                <p className="text-xs text-brand-text-muted font-mono mt-1">Level 5 Clearance</p>
-              </div>
+
+            <div className="relative border-l border-brand-border pl-6">
+              <button 
+                onClick={() => {
+                  setIsAdminMenuOpen(!isAdminMenuOpen);
+                  setIsNotificationsOpen(false);
+                }}
+                className="flex items-center space-x-3 hover:opacity-80 transition-opacity text-left"
+              >
+                <div className="w-8 h-8 rounded-full bg-brand-elevated border border-brand-border flex items-center justify-center overflow-hidden">
+                  <img src="https://ui-avatars.com/api/?name=Admin&background=4F46E5&color=fff" alt="Admin" />
+                </div>
+                <div className="text-sm">
+                  <p className="font-bold leading-none">Admin Alpha</p>
+                  <p className="text-xs text-brand-text-muted font-mono mt-1">Level 5 Clearance</p>
+                </div>
+              </button>
+
+              {/* Admin Menu Dropdown */}
+              <AnimatePresence>
+                {isAdminMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-3 w-56 bg-brand-surface border border-brand-border rounded-2xl shadow-2xl p-2 z-50 font-mono text-xs space-y-1"
+                  >
+                    <button 
+                      onClick={() => { navigate('/settings'); setIsAdminMenuOpen(false); }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-brand-elevated text-brand-text transition-colors flex items-center space-x-2"
+                    >
+                      <Settings className="w-4 h-4 text-brand-primary" />
+                      <span>Operator Settings</span>
+                    </button>
+                    <button 
+                      onClick={() => { toggleTerminal(); setIsAdminMenuOpen(false); }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-brand-elevated text-brand-text transition-colors flex items-center space-x-2"
+                    >
+                      <TerminalIcon className="w-4 h-4 text-brand-accent" />
+                      <span>Command Terminal</span>
+                    </button>
+                    <div className="border-t border-brand-border my-1" />
+                    <button 
+                      onClick={() => { handleLogout(); setIsAdminMenuOpen(false); }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-brand-danger/20 text-brand-danger transition-colors flex items-center space-x-2 font-bold"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Terminate Session</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </header>
@@ -170,9 +296,9 @@ export default function Layout() {
               >
                 {[
                   { label: 'System Terminal', icon: TerminalIcon, color: 'bg-[#1C2541]', onClick: toggleTerminal },
-                  { label: 'Force Post Now', icon: Zap, color: 'bg-brand-primary', onClick: () => setPendingCommand('/post') },
-                  { label: 'Trigger Security Scan', icon: ShieldAlert, color: 'bg-brand-danger', onClick: () => setPendingCommand('/scan') },
-                  { label: 'System Pulse Check', icon: Activity, color: 'bg-brand-accent', onClick: () => setPendingCommand('/ping') },
+                  { label: 'Force Post Now', icon: Zap, color: 'bg-brand-primary', onClick: () => handleFabCommand('/post', '/posts') },
+                  { label: 'Trigger Security Scan', icon: ShieldAlert, color: 'bg-brand-danger', onClick: () => handleFabCommand('/scan', '/guardian') },
+                  { label: 'System Pulse Check', icon: Activity, color: 'bg-brand-accent', onClick: () => handleFabCommand('/ping') },
                 ].map((action, i) => (
                   <motion.button
                     key={action.label}

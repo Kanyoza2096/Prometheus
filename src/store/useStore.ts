@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
+import { supabase, isSupabaseConfigured, refreshSupabaseClient } from '../lib/supabase';
 
 export type ServiceStatus = 'online' | 'degraded' | 'offline';
 
@@ -59,12 +60,18 @@ interface AppState {
   masterToken: string;
   setConnectionParams: (params: { wsEndpoint?: string; restEndpoint?: string; masterToken?: string }) => void;
 
+  supabaseUrl: string;
+  supabaseAnonKey: string;
   geminiKey: string;
+  githubToken: string;
+  githubRepo: string;
+  githubBranch: string;
   fbPageId: string;
   fbVerifyToken: string;
   fbPageAccessToken: string;
   fbAppSecret: string;
-  setServiceKeys: (keys: { geminiKey?: string; fbPageId?: string; fbVerifyToken?: string; fbPageAccessToken?: string; fbAppSecret?: string }) => void;
+  isUsingLiveBackendData: boolean;
+  setServiceKeys: (keys: { supabaseUrl?: string; supabaseAnonKey?: string; geminiKey?: string; githubToken?: string; githubRepo?: string; githubBranch?: string; fbPageId?: string; fbVerifyToken?: string; fbPageAccessToken?: string; fbAppSecret?: string }) => void;
 
   socket: Socket | null;
   socketConnected: boolean;
@@ -139,19 +146,32 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  supabaseUrl: localStorage.getItem('supabase_url') || import.meta.env.VITE_SUPABASE_URL || '',
+  supabaseAnonKey: localStorage.getItem('supabase_anon_key') || import.meta.env.VITE_SUPABASE_ANON_KEY || '',
   geminiKey: localStorage.getItem('gemini_key') || '',
+  githubToken: localStorage.getItem('github_token') || '',
+  githubRepo: localStorage.getItem('github_repo') || '',
+  githubBranch: localStorage.getItem('github_branch') || 'main',
   fbPageId: localStorage.getItem('fb_page_id') || '',
   fbVerifyToken: localStorage.getItem('fb_verify_token') || '',
   fbPageAccessToken: localStorage.getItem('fb_page_access_token') || '',
   fbAppSecret: localStorage.getItem('fb_app_secret') || '',
+  isUsingLiveBackendData: false,
   setServiceKeys: (keys) => {
+    if (keys.supabaseUrl !== undefined) localStorage.setItem('supabase_url', keys.supabaseUrl);
+    if (keys.supabaseAnonKey !== undefined) localStorage.setItem('supabase_anon_key', keys.supabaseAnonKey);
     if (keys.geminiKey !== undefined) localStorage.setItem('gemini_key', keys.geminiKey);
+    if (keys.githubToken !== undefined) localStorage.setItem('github_token', keys.githubToken);
+    if (keys.githubRepo !== undefined) localStorage.setItem('github_repo', keys.githubRepo);
+    if (keys.githubBranch !== undefined) localStorage.setItem('github_branch', keys.githubBranch);
     if (keys.fbPageId !== undefined) localStorage.setItem('fb_page_id', keys.fbPageId);
     if (keys.fbVerifyToken !== undefined) localStorage.setItem('fb_verify_token', keys.fbVerifyToken);
     if (keys.fbPageAccessToken !== undefined) localStorage.setItem('fb_page_access_token', keys.fbPageAccessToken);
     if (keys.fbAppSecret !== undefined) localStorage.setItem('fb_app_secret', keys.fbAppSecret);
 
     set((state) => ({ ...state, ...keys }));
+    refreshSupabaseClient();
+    get().fetchInitialData();
   },
 
   socket: null,
@@ -235,7 +255,11 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  messages: [],
+  messages: [
+    { id: 'm1', user: 'Operator_01', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80', message: 'Core neural pipeline initialized with vector 0x09', time: Date.now() - 120000, sentiment: 'positive' },
+    { id: 'm2', user: 'Guardian_Bot', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80', message: 'Security scan completed: 0 active threats detected in perimeter', time: Date.now() - 340000, sentiment: 'positive' },
+    { id: 'm3', user: 'System_Relay', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80', message: 'API rate limits nominal across all active gateway nodes', time: Date.now() - 600000, sentiment: 'neutral' }
+  ],
   addMessage: (msg) => set(state => ({ 
     messages: [msg, ...state.messages].slice(0, 20) 
   })),
@@ -350,81 +374,126 @@ export const useStore = create<AppState>((set, get) => ({
 
   fetchInitialData: async () => {
     const { restEndpoint, masterToken } = get();
-    if (!restEndpoint) return;
-    try {
-      const baseUrl = restEndpoint.endsWith('/') ? restEndpoint.slice(0, -1) : restEndpoint;
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (masterToken) {
-        headers['Authorization'] = `Bearer ${masterToken}`;
-        headers['X-API-Token'] = masterToken;
-        headers['x-api-key'] = masterToken;
-      }
+    let loadedLive = false;
 
-      // Try fetching stats
-      const statsRes = await fetch(`${baseUrl}/stats`, { headers }).catch(() => null);
-      if (statsRes && statsRes.ok) {
-        const statsData = await statsRes.json();
-        if (statsData) {
-          get().updateStats(statsData);
+    // 1. Try querying Supabase if configured with real credentials
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: supaMsgs } = await supabase.from('messages').select('*').limit(20);
+        if (supaMsgs && supaMsgs.length > 0) {
+          set({ messages: supaMsgs });
+          loadedLive = true;
         }
-      }
 
-      // Try fetching messages
-      const msgsRes = await fetch(`${baseUrl}/messages`, { headers }).catch(() => null);
-      if (msgsRes && msgsRes.ok) {
-        const msgsData = await msgsRes.json();
-        if (Array.isArray(msgsData)) {
-          set({ messages: msgsData });
+        const { data: supaPosts } = await supabase.from('posts').select('*').limit(20);
+        if (supaPosts && supaPosts.length > 0) {
+          set({ recentPosts: supaPosts });
+          loadedLive = true;
         }
-      }
 
-      // Try fetching posts
-      const postsRes = await fetch(`${baseUrl}/posts`, { headers }).catch(() => null);
-      if (postsRes && postsRes.ok) {
-        const postsData = await postsRes.json();
-        if (Array.isArray(postsData)) {
-          set({ recentPosts: postsData });
+        const { data: supaAlerts } = await supabase.from('alerts').select('*').limit(20);
+        if (supaAlerts && supaAlerts.length > 0) {
+          set({ guardianAlerts: supaAlerts });
+          loadedLive = true;
         }
-      }
 
-      // Try fetching alerts
-      const alertsRes = await fetch(`${baseUrl}/alerts`, { headers }).catch(() => null);
-      if (alertsRes && alertsRes.ok) {
-        const alertsData = await alertsRes.json();
-        if (Array.isArray(alertsData)) {
-          set({ guardianAlerts: alertsData });
+        const { data: supaPayloads } = await supabase.from('payloads').select('*').limit(20);
+        if (supaPayloads && supaPayloads.length > 0) {
+          set({ payloads: supaPayloads });
+          loadedLive = true;
         }
+      } catch (err) {
+        console.warn('Supabase query error:', err);
       }
+    }
 
-      // Try fetching health matrix
-      const healthRes = await fetch(`${baseUrl}/health`, { headers }).catch(() => null);
-      if (healthRes && healthRes.ok) {
-        const healthData = await healthRes.json();
-        if (Array.isArray(healthData)) {
-          set({ healthMatrix: healthData });
+    // 2. Try fetching from custom REST API
+    if (restEndpoint) {
+      try {
+        const baseUrl = restEndpoint.endsWith('/') ? restEndpoint.slice(0, -1) : restEndpoint;
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (masterToken) {
+          headers['Authorization'] = `Bearer ${masterToken}`;
+          headers['X-API-Token'] = masterToken;
+          headers['x-api-key'] = masterToken;
         }
-      }
 
-      // Try fetching payloads/logs/traffic from backend API
-      const payloadsRes = await fetch(`${baseUrl}/payloads`, { headers }).catch(() => null);
-      if (payloadsRes && payloadsRes.ok) {
-        const payloadsData = await payloadsRes.json();
-        if (Array.isArray(payloadsData) && payloadsData.length > 0) {
-          set({ payloads: payloadsData });
-        }
-      } else {
-        const logsRes = await fetch(`${baseUrl}/logs`, { headers }).catch(() => null);
-        if (logsRes && logsRes.ok) {
-          const logsData = await logsRes.json();
-          if (Array.isArray(logsData) && logsData.length > 0) {
-            set({ payloads: logsData });
+        // Try fetching stats
+        const statsRes = await fetch(`${baseUrl}/stats`, { headers }).catch(() => null);
+        if (statsRes && statsRes.ok) {
+          const statsData = await statsRes.json();
+          if (statsData) {
+            get().updateStats(statsData);
+            loadedLive = true;
           }
         }
+
+        // Try fetching messages
+        const msgsRes = await fetch(`${baseUrl}/messages`, { headers }).catch(() => null);
+        if (msgsRes && msgsRes.ok) {
+          const msgsData = await msgsRes.json();
+          if (Array.isArray(msgsData) && msgsData.length > 0) {
+            set({ messages: msgsData });
+            loadedLive = true;
+          }
+        }
+
+        // Try fetching posts
+        const postsRes = await fetch(`${baseUrl}/posts`, { headers }).catch(() => null);
+        if (postsRes && postsRes.ok) {
+          const postsData = await postsRes.json();
+          if (Array.isArray(postsData) && postsData.length > 0) {
+            set({ recentPosts: postsData });
+            loadedLive = true;
+          }
+        }
+
+        // Try fetching alerts
+        const alertsRes = await fetch(`${baseUrl}/alerts`, { headers }).catch(() => null);
+        if (alertsRes && alertsRes.ok) {
+          const alertsData = await alertsRes.json();
+          if (Array.isArray(alertsData) && alertsData.length > 0) {
+            set({ guardianAlerts: alertsData });
+            loadedLive = true;
+          }
+        }
+
+        // Try fetching health matrix
+        const healthRes = await fetch(`${baseUrl}/health`, { headers }).catch(() => null);
+        if (healthRes && healthRes.ok) {
+          const healthData = await healthRes.json();
+          if (Array.isArray(healthData) && healthData.length > 0) {
+            set({ healthMatrix: healthData });
+            loadedLive = true;
+          }
+        }
+
+        // Try fetching payloads/logs/traffic from backend API
+        const payloadsRes = await fetch(`${baseUrl}/payloads`, { headers }).catch(() => null);
+        if (payloadsRes && payloadsRes.ok) {
+          const payloadsData = await payloadsRes.json();
+          if (Array.isArray(payloadsData) && payloadsData.length > 0) {
+            set({ payloads: payloadsData });
+            loadedLive = true;
+          }
+        } else {
+          const logsRes = await fetch(`${baseUrl}/logs`, { headers }).catch(() => null);
+          if (logsRes && logsRes.ok) {
+            const logsData = await logsRes.json();
+            if (Array.isArray(logsData) && logsData.length > 0) {
+              set({ payloads: logsData });
+              loadedLive = true;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch initial data from backend:', err);
       }
-    } catch (err) {
-      console.warn('Failed to fetch initial data from backend:', err);
     }
+
+    set({ isUsingLiveBackendData: loadedLive });
   },
+
 }));

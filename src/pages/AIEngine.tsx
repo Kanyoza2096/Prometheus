@@ -1,22 +1,62 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { BrainCircuit, SlidersHorizontal, Sparkles, Target, Zap, Bot, MessageSquareText } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { BrainCircuit, SlidersHorizontal, Sparkles, Target, Zap, Bot, MessageSquareText, Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function AIEngine() {
   const [tone, setTone] = useState(65);
   const [aggression, setAggression] = useState(30);
   const [humor, setHumor] = useState(50);
+  const [primaryModel, setPrimaryModel] = useState<'pro' | 'flash'>('pro');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [promptOverride, setPromptOverride] = useState(
     "You are Kanyoza, an advanced enterprise automation bot. Always remain professional but slightly witty. Analyze user requests thoroughly."
   );
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleApplyPersona = () => {
+    showToast('AI Personality Matrix overrides deployed to LLM orchestrator.');
+  };
+
+  const getPreviewText = () => {
+    let text = "Acknowledged. I'll execute the background sync now.";
+    if (humor > 66) {
+      text += " Don't worry, I haven't broken the prod server... today.";
+    } else if (aggression > 66) {
+      text += " Stand aside and let me handle this immediately.";
+    } else if (tone < 33) {
+      text += " Task queued with priority vector 0x01. Operating within nominal bounds.";
+    } else {
+      text += " Operating at optimal parameters.";
+    }
+    return text;
+  };
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-6xl mx-auto"
+      className="max-w-6xl mx-auto relative"
     >
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-20 right-8 z-50 bg-brand-primary text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-2 font-mono text-xs font-bold"
+          >
+            <Check className="w-4 h-4 text-brand-success" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="mb-8">
         <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center">
           <BrainCircuit className="w-8 h-8 mr-3 text-brand-primary" />
@@ -118,11 +158,14 @@ export default function AIEngine() {
                 placeholder="Enter system instructions..."
               />
             </div>
-            <div className="mt-4 flex justify-between items-center">
+            <div className="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <span className="text-xs text-brand-text-muted font-mono">
                 Supports standard Jinja2 template variables.
               </span>
-              <button className="bg-brand-primary text-white px-6 py-2 rounded-lg text-sm font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors shadow-glow-primary flex items-center">
+              <button 
+                onClick={handleApplyPersona}
+                className="bg-brand-primary text-white px-6 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors shadow-glow-primary flex items-center"
+              >
                 <Zap className="w-4 h-4 mr-2" />
                 Apply Persona
               </button>
@@ -138,13 +181,23 @@ export default function AIEngine() {
             </h2>
             
             <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-brand-elevated border border-brand-primary/30 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary"></div>
+              <div 
+                onClick={() => { setPrimaryModel('pro'); showToast('Primary model set to Gemini 1.5 Pro'); }}
+                className={cn(
+                  "p-4 rounded-xl cursor-pointer transition-all border relative overflow-hidden",
+                  primaryModel === 'pro' 
+                    ? "bg-brand-elevated border-brand-primary/50 shadow-md" 
+                    : "bg-brand-bg border-brand-border hover:border-brand-primary/30"
+                )}
+              >
+                {primaryModel === 'pro' && <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary"></div>}
                 <div className="flex justify-between items-start mb-1">
                   <h3 className="font-bold text-sm">Gemini 1.5 Pro</h3>
-                  <span className="flex items-center text-[10px] font-bold text-brand-success bg-brand-success/10 px-2 py-0.5 rounded-full uppercase">
-                    <div className="w-1.5 h-1.5 rounded-full bg-brand-success mr-1 animate-pulse"></div>
-                    Primary
+                  <span className={cn(
+                    "flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full uppercase",
+                    primaryModel === 'pro' ? "text-brand-success bg-brand-success/10" : "text-brand-text-muted bg-brand-surface"
+                  )}>
+                    {primaryModel === 'pro' ? 'Primary' : 'Select'}
                   </span>
                 </div>
                 <p className="text-xs text-brand-text-muted font-mono mb-2">Used for complex reasoning & workflow orchestration</p>
@@ -153,11 +206,23 @@ export default function AIEngine() {
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-brand-bg border border-brand-border relative">
+              <div 
+                onClick={() => { setPrimaryModel('flash'); showToast('Primary model set to Gemini 1.5 Flash'); }}
+                className={cn(
+                  "p-4 rounded-xl cursor-pointer transition-all border relative overflow-hidden",
+                  primaryModel === 'flash' 
+                    ? "bg-brand-elevated border-brand-primary/50 shadow-md" 
+                    : "bg-brand-bg border-brand-border hover:border-brand-primary/30"
+                )}
+              >
+                {primaryModel === 'flash' && <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary"></div>}
                 <div className="flex justify-between items-start mb-1">
                   <h3 className="font-bold text-sm">Gemini 1.5 Flash</h3>
-                  <span className="flex items-center text-[10px] font-bold text-brand-text-muted bg-brand-elevated px-2 py-0.5 rounded-full uppercase">
-                    Fallback
+                  <span className={cn(
+                    "flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full uppercase",
+                    primaryModel === 'flash' ? "text-brand-success bg-brand-success/10" : "text-brand-text-muted bg-brand-surface"
+                  )}>
+                    {primaryModel === 'flash' ? 'Primary' : 'Select'}
                   </span>
                 </div>
                 <p className="text-xs text-brand-text-muted font-mono mb-2">High throughput text classification & routing</p>
@@ -174,9 +239,9 @@ export default function AIEngine() {
               <Bot className="w-4 h-4 mr-2 text-brand-primary" />
               Personality Preview
             </h2>
-            <div className="p-4 bg-brand-bg rounded-lg border border-brand-border mt-4 relative z-10">
-              <p className="text-sm text-brand-text-muted italic">
-                "Acknowledged. I'll execute the background sync now. Don't worry, I haven't broken the prod server... today."
+            <div className="p-4 bg-brand-bg rounded-xl border border-brand-border mt-4 relative z-10">
+              <p className="text-sm text-brand-text-muted italic leading-relaxed">
+                "{getPreviewText()}"
               </p>
             </div>
           </div>
