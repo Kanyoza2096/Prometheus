@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Monitor, Terminal, Shield, Activity, Settings, Globe } from 'lucide-react';
+import { Search, Monitor, Terminal, Shield, Activity, Settings, Globe, GitBranch, BrainCircuit, Network, BarChart3 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 
@@ -41,12 +41,16 @@ export default function CommandPalette() {
   }, [isOpen]);
 
   const commands: CommandItem[] = [
-    { id: '1', icon: Monitor, title: 'Open Main Console', subtitle: 'Go to Dashboard', action: () => navigate('/') },
-    { id: '2', icon: Terminal, title: 'Launch Terminal', subtitle: 'Toggle Command Line Interface', action: toggleTerminal },
-    { id: '3', icon: Globe, title: 'Broadcast Network', subtitle: 'Manage Social Posts', action: () => navigate('/posts') },
-    { id: '4', icon: Shield, title: 'Guardian Logs', subtitle: 'Security and Threat Analysis', action: () => navigate('/guardian') },
-    { id: '5', icon: Activity, title: 'API Analytics', subtitle: 'View Latency & Metrics', action: () => navigate('/api') },
-    { id: '6', icon: Settings, title: 'System Settings', subtitle: 'Configure Platform', action: () => navigate('/settings') },
+    { id: '1',  icon: Monitor,      title: 'Open Main Console',    subtitle: 'Go to Dashboard',                         action: () => navigate('/') },
+    { id: '2',  icon: Terminal,     title: 'Launch Terminal',       subtitle: 'Toggle Command Line Interface',           action: toggleTerminal },
+    { id: '3',  icon: Globe,        title: 'Broadcast Network',     subtitle: 'Manage Social Posts',                     action: () => navigate('/posts') },
+    { id: '4',  icon: BrainCircuit, title: 'AI Engine',             subtitle: 'Manage Persona & Prompts',                action: () => navigate('/ai-engine') },
+    { id: '5',  icon: Shield,       title: 'Guardian Logs',         subtitle: 'Security and Threat Analysis',            action: () => navigate('/guardian') },
+    { id: '6',  icon: GitBranch,    title: 'Workflows',             subtitle: 'Automation Task Pipelines',               action: () => navigate('/workflows') },
+    { id: '7',  icon: Network,      title: 'Prometheus Metrics',    subtitle: 'Live Infrastructure Telemetry',           action: () => navigate('/prometheus') },
+    { id: '8',  icon: Activity,     title: 'API Analytics',         subtitle: 'View Latency & Request Metrics',          action: () => navigate('/api') },
+    { id: '9',  icon: BarChart3,    title: 'Payload Inspector',     subtitle: 'Inspect & Simulate API Payloads',         action: () => navigate('/payloads') },
+    { id: '10', icon: Settings,     title: 'System Settings',       subtitle: 'Configure Platform & Credentials',        action: () => navigate('/settings') },
   ];
 
   const filteredCommands = commands.filter(cmd => 

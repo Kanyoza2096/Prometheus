@@ -29,9 +29,10 @@ export default function UplinkDownOverlay({
   const [retryCount, setRetryCount] = useState(0);
   const [lastError,  setLastError]  = useState<string | null>(null);
 
-  const bootedRef  = useRef(false);
-  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const phaseRef   = useRef<Phase>('hidden');
+  const bootedRef         = useRef(false);
+  const wasEverConnected  = useRef(false);
+  const timerRef          = useRef<ReturnType<typeof setInterval> | null>(null);
+  const phaseRef          = useRef<Phase>('hidden');
 
   // Keep phaseRef in sync so callbacks don't read stale state
   useEffect(() => { phaseRef.current = phase; }, [phase]);
@@ -42,7 +43,16 @@ export default function UplinkDownOverlay({
     return () => clearTimeout(t);
   }, []);
 
+  // Track whether the socket was ever successfully connected this session
+  useEffect(() => {
+    if (socketConnected) {
+      wasEverConnected.current = true;
+    }
+  }, [socketConnected]);
+
   // React to connection changes after boot
+  // Only surface the overlay if the socket was previously connected and then dropped
+  // (i.e., a real backend was configured and then lost). Never show on initial load failure.
   useEffect(() => {
     if (!bootedRef.current) return;
 
@@ -59,7 +69,11 @@ export default function UplinkDownOverlay({
         return () => clearTimeout(t);
       }
     } else {
-      if (!dismissed && (phaseRef.current === 'hidden' || phaseRef.current === 'success')) {
+      // Only show the overlay if:
+      // 1. The socket was previously connected (real backend was configured)
+      // 2. OR the user has confirmed live backend data is in use
+      const shouldAlert = wasEverConnected.current || isUsingLiveBackendData;
+      if (shouldAlert && !dismissed && (phaseRef.current === 'hidden' || phaseRef.current === 'success')) {
         setPhase('countdown');
         setCountdown(COUNTDOWN_SECS);
       }
@@ -67,10 +81,11 @@ export default function UplinkDownOverlay({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socketConnected]);
 
-  // Re-surface after dismiss clears
+  // Re-surface after dismiss clears (only if socket was ever connected)
   useEffect(() => {
     if (!bootedRef.current) return;
-    if (!socketConnected && !dismissed && phaseRef.current === 'hidden') {
+    const shouldAlert = wasEverConnected.current || isUsingLiveBackendData;
+    if (!socketConnected && !dismissed && shouldAlert && phaseRef.current === 'hidden') {
       setPhase('countdown');
       setCountdown(COUNTDOWN_SECS);
     }
@@ -333,7 +348,7 @@ export default function UplinkDownOverlay({
                         </h2>
                       </div>
                       <p className="text-xs text-brand-text-muted font-mono leading-relaxed">
-                        No connection to the backend engine. Verify your WebSocket endpoint in&nbsp;
+                        Backend connection was lost. Verify your WebSocket endpoint in&nbsp;
                         <span className="text-brand-primary font-bold">Settings → Engine Credentials</span>.
                       </p>
                     </div>

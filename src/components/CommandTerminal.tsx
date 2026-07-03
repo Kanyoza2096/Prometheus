@@ -13,7 +13,7 @@ interface LogLine {
 }
 
 export default function CommandTerminal() {
-  const { isTerminalOpen, toggleTerminal, healthMatrix, pendingCommand, setPendingCommand, stats, restEndpoint, masterToken } = useStore();
+  const { isTerminalOpen, toggleTerminal, healthMatrix, pendingCommand, setPendingCommand, stats, restEndpoint, masterToken, personaMood } = useStore();
   const [isMaximized, setIsMaximized] = useState(false);
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<LogLine[]>([]);
@@ -151,10 +151,17 @@ export default function CommandTerminal() {
           setTimeout(() => addLog('system', 'Core modules restarted. New config applied.'), 1500);
           break;
 
-        case '/mood':
-          addLog('system', 'Current Persona Mood: HIGHLY ANALYTICAL & PROFESSIONAL 🧠');
-          addLog('info', 'Sentiment bias: +0.2 (Optimistic)');
+        case '/mood': {
+          const moodEmojis: Record<string, string> = {
+            analytical:   '🧠',
+            professional: '💼',
+            creative:     '🎨',
+            urgent:       '⚡',
+          };
+          addLog('system', `Current Persona Mood: ${personaMood.toUpperCase()} ${moodEmojis[personaMood] ?? ''}`);
+          addLog('info', 'Change mood in Settings → General Settings → Persona Mood.');
           break;
+        }
 
         case '/scan':
           addLog('warning', 'Initiating Code Guardian security scan...');

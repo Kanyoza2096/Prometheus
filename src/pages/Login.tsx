@@ -147,9 +147,8 @@ export default function Login() {
         </motion.div>
       </motion.div>
 
-      {/* Helper text for the reviewer */}
-      <div className="absolute bottom-4 left-0 w-full flex flex-col items-center justify-center text-brand-text-muted font-mono text-xs opacity-50 space-y-1">
-        <p>Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set</p>
+      <div className="absolute bottom-4 left-0 w-full flex flex-col items-center justify-center text-brand-text-muted font-mono text-xs opacity-40 space-y-1">
+        <p>Kanyoza Systems AI Platform v10 · Authorized Access Only</p>
       </div>
     </div>
   );
