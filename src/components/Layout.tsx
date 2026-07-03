@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStore } from '../store/useStore';
@@ -24,6 +24,7 @@ import { cn } from '../lib/utils';
 import CommandTerminal from './CommandTerminal';
 import CommandPalette from './CommandPalette';
 import { ConnectionOrb, ConnectionBadge } from './ConnectionOrb';
+import UplinkDownOverlay, { syncSocketRef } from './UplinkDownOverlay';
 import { supabase } from '../lib/supabase';
 
 export default function Layout() {
@@ -61,6 +62,16 @@ export default function Layout() {
     connectSocket();
     fetchInitialData();
     return () => disconnectSocket();
+  }, [connectSocket, disconnectSocket, fetchInitialData]);
+
+  // Keep the stale-closure ref in the overlay in sync
+  useEffect(() => { syncSocketRef(socketConnected); }, [socketConnected]);
+
+  const handleRetry = useCallback(async () => {
+    disconnectSocket();
+    await new Promise(r => setTimeout(r, 400));
+    connectSocket();
+    await fetchInitialData();
   }, [connectSocket, disconnectSocket, fetchInitialData]);
 
   const navItems = [
@@ -392,6 +403,13 @@ export default function Layout() {
 
       <CommandPalette />
       <CommandTerminal />
+
+      {/* Uplink Down Overlay — appears when socket disconnects after boot */}
+      <UplinkDownOverlay
+        socketConnected={socketConnected}
+        isUsingLiveBackendData={isUsingLiveBackendData}
+        onRetry={handleRetry}
+      />
     </div>
   );
 }
