@@ -113,6 +113,9 @@ interface AppState {
   personaMood: 'analytical' | 'professional' | 'creative' | 'urgent';
   setPersonaMood: (mood: AppState['personaMood']) => void;
 
+  latencyHistory: number[];
+  pushLatency: (ms: number) => void;
+
   fetchInitialData: () => Promise<void>;
 }
 
@@ -383,6 +386,11 @@ export const useStore = create<AppState>((set, get) => ({
     localStorage.setItem('persona_mood', mood);
     set({ personaMood: mood });
   },
+
+  latencyHistory: [],
+  pushLatency: (ms) => set(state => ({
+    latencyHistory: [...state.latencyHistory.slice(-59), ms],
+  })),
 
   fetchInitialData: async () => {
     const { restEndpoint, masterToken } = get();

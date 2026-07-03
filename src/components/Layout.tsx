@@ -31,7 +31,7 @@ export default function Layout() {
   const {
     logout, socketConnected, connectSocket, disconnectSocket,
     guardianAlerts, toggleTerminal, setPendingCommand, fetchInitialData, isUsingLiveBackendData,
-    personaMood,
+    personaMood, restEndpoint, masterToken, latencyHistory, pushLatency,
   } = useStore();
 
   const MOOD_META: Record<string, { emoji: string; color: string }> = {
@@ -73,6 +73,29 @@ export default function Layout() {
     connectSocket();
     await fetchInitialData();
   }, [connectSocket, disconnectSocket, fetchInitialData]);
+
+  // Periodic RTT measurement — ping the REST /health endpoint every 3 s
+  useEffect(() => {
+    if (!socketConnected) return;
+    const measure = async () => {
+      const url = restEndpoint
+        ? `${restEndpoint.replace(/\/$/, '')}/health`
+        : null;
+      if (!url) return;
+      const t0 = performance.now();
+      try {
+        const headers: Record<string, string> = {};
+        if (masterToken) headers['Authorization'] = `Bearer ${masterToken}`;
+        const res = await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(4000) });
+        if (res.ok) pushLatency(Math.round(performance.now() - t0));
+      } catch {
+        // silently ignore — only record successful round-trips
+      }
+    };
+    measure();
+    const id = setInterval(measure, 3000);
+    return () => clearInterval(id);
+  }, [socketConnected, restEndpoint, masterToken, pushLatency]);
 
   const navItems = [
     { to: '/',          icon: LayoutDashboard, label: 'Command Center' },
@@ -152,11 +175,12 @@ export default function Layout() {
         </div>
 
         <div className="p-4 border-t border-brand-border">
-          {/* Beautiful spinning connection orb */}
+          {/* Beautiful spinning connection orb + latency sparkline */}
           <div className="flex flex-col items-center py-3 mb-2">
             <ConnectionOrb
               socketConnected={socketConnected}
               isUsingLiveBackendData={isUsingLiveBackendData}
+              latencyHistory={latencyHistory}
             />
           </div>
           <button
