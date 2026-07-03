@@ -13,19 +13,20 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  // Class-field syntax avoids constructor initialisation issues with
-  // useDefineForClassFields (the default in TypeScript 5 / ES2022 targets).
-  override state: State = { hasError: false };
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  override componentDidCatch(error: Error, info: React.ErrorInfo) {
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error(`[ErrorBoundary: ${this.props.name ?? 'unknown'}]`, error, info);
   }
 
-  override render() {
+  render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
       return (
@@ -41,7 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
           )}
           <button
             onClick={() => this.setState({ hasError: false, error: undefined })}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-surface-2 text-brand-text-muted hover:text-white text-xs font-mono transition-colors mt-1"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-elevated text-brand-text-muted hover:text-white text-xs font-mono transition-colors mt-1"
           >
             <RefreshCw className="w-3 h-3" />
             Retry

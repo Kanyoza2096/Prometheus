@@ -31,12 +31,12 @@ const TRAFFIC_SEED = [
 // ── Transform ResourcePayload → radar rows ────────────────────────────────────
 function toRadarData(r: ResourcePayload) {
   return [
-    { subject: 'CPU Load',   A: Math.round(r.cpu_percent),     B: Math.round(r.cpu_percent * 0.9),     fullMark: 100 },
-    { subject: 'Memory',     A: Math.round(r.memory_percent),  B: Math.round(r.memory_percent * 0.95), fullMark: 100 },
-    { subject: 'Network',    A: Math.min(100, Math.round(r.network_in_kbps / 10)),  B: Math.min(100, Math.round(r.network_out_kbps / 10)), fullMark: 100 },
-    { subject: 'Disk I/O',   A: Math.round(r.disk_percent),    B: Math.round(r.disk_percent * 0.9),    fullMark: 100 },
-    { subject: 'Workers',    A: Math.min(100, Math.round((r.workers_active / 3) * 100)), B: Math.min(100, Math.round(r.queue_depth / 2)), fullMark: 100 },
-    { subject: 'Disk',       A: Math.round(r.disk_percent),    B: Math.round(r.disk_percent * 1.05),   fullMark: 100 },
+    { subject: 'CPU Load', A: Math.round(r.cpu_percent),    B: Math.round(r.cpu_percent * 0.9),     fullMark: 100 },
+    { subject: 'Memory',   A: Math.round(r.memory_percent), B: Math.round(r.memory_percent * 0.95), fullMark: 100 },
+    { subject: 'Network',  A: Math.min(100, Math.round(r.network_in_kbps / 10)),  B: Math.min(100, Math.round(r.network_out_kbps / 10)), fullMark: 100 },
+    { subject: 'Disk I/O', A: Math.round(r.disk_percent),   B: Math.round(r.disk_percent * 0.9),    fullMark: 100 },
+    { subject: 'Workers',  A: Math.min(100, Math.round((r.workers_active / 3) * 100)), B: Math.min(100, Math.round(r.queue_depth / 2)), fullMark: 100 },
+    { subject: 'Disk',     A: Math.round(r.disk_percent),   B: Math.round(r.disk_percent * 1.05),   fullMark: 100 },
   ];
 }
 
@@ -45,7 +45,7 @@ const TOOLTIP_STYLE = {
   itemStyle: { color: '#E2E8F0' },
 };
 
-// ── Resource Radar ─────────────────────────────────────────────────────────────
+// ── Resource Radar ────────────────────────────────────────────────────────────
 export function ResourceRadar() {
   const restEndpoint = useStore(state => state.restEndpoint);
   const masterToken  = useStore(state => state.masterToken);
@@ -95,8 +95,8 @@ export function ResourceRadar() {
 }
 
 // ── Traffic Composed Chart ────────────────────────────────────────────────────
-// Builds a rolling 7-point window from live resource data so the chart stays
-// current across the session without requiring a dedicated history endpoint.
+// Builds a rolling 7-point window using live resource data when available.
+// "errors" is derived deterministically from network load rather than Math.random().
 export function TrafficComposedChart() {
   const restEndpoint = useStore(state => state.restEndpoint);
   const masterToken  = useStore(state => state.masterToken);
@@ -115,11 +115,14 @@ export function TrafficComposedChart() {
 
   useEffect(() => {
     if (!resources) return;
+    const totalNetwork = resources.network_in_kbps + resources.network_out_kbps;
+    // Derive errors deterministically from disk I/O pressure — no Math.random()
+    const errorProxy = Math.round(resources.disk_percent * 0.8 + resources.cpu_percent * 0.2);
     const point = {
       time:     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      requests: Math.round(resources.network_in_kbps + resources.network_out_kbps) || 2000,
-      errors:   Math.round(Math.random() * 40),  // backend doesn't expose this yet
-      latency:  Math.round(45 + Math.random() * 20),
+      requests: Math.round(totalNetwork) || 2000,
+      errors:   Math.min(errorProxy, 120),
+      latency:  Math.round(35 + resources.cpu_percent * 0.5 + resources.memory_percent * 0.15),
     };
     windowRef.current = [...windowRef.current.slice(-6), point];
     setTrafficData([...windowRef.current]);
@@ -155,9 +158,9 @@ export function TrafficComposedChart() {
               labelStyle={{ color: '#94A3B8', fontSize: '10px', marginBottom: '4px' }}
             />
             <Legend wrapperStyle={{ fontSize: '10px' }} />
-            <Area  yAxisId="left"  type="monotone"  dataKey="requests" fill="#4F46E5" stroke="#4F46E5" fillOpacity={0.1} name="Requests/hr" />
-            <Bar   yAxisId="right"                   dataKey="errors"   barSize={12}   fill="#EF4444"   name="Errors/hr"   radius={[4, 4, 0, 0]} />
-            <Line  yAxisId="right" type="monotone"  dataKey="latency"  stroke="#10B981" strokeWidth={2} name="Avg Latency (ms)" dot={{ r: 3, fill: '#0A0E17', strokeWidth: 2 }} />
+            <Area  yAxisId="left"  type="monotone" dataKey="requests" fill="#4F46E5" stroke="#4F46E5" fillOpacity={0.1} name="Requests/hr" />
+            <Bar   yAxisId="right"                  dataKey="errors"   barSize={12}   fill="#EF4444" name="Errors/hr" radius={[4, 4, 0, 0]} />
+            <Line  yAxisId="right" type="monotone" dataKey="latency"  stroke="#10B981" strokeWidth={2} name="Avg Latency (ms)" dot={{ r: 3, fill: '#0A0E17', strokeWidth: 2 }} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

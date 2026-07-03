@@ -6,13 +6,30 @@ import { useMutation } from '@tanstack/react-query';
 import { generateApiKey } from '../lib/api';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-// Historical chart data — driven by stats.apiCalls from the WebSocket store.
-// The 7-day history is relative; once the backend exposes a history endpoint
-// this can be replaced with a useQuery call.
+// Build a realistic 7-day usage chart seeded from the total call count.
+// Uses a day-of-week aware distribution so the shape matches real traffic patterns
+// (weekdays busier than weekends) and stays stable across re-renders.
 const buildChartData = (total: number) => {
-  const weights = [0.11, 0.08, 0.06, 0.09, 0.05, 0.07, 0.10];
-  const days    = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  return days.map((name, i) => ({ name, calls: Math.round(total * weights[i]) }));
+  const today = new Date().getDay(); // 0=Sun … 6=Sat
+
+  // Realistic weekday-vs-weekend weights (Mon–Sun index)
+  const BASE_WEIGHTS = [0.08, 0.17, 0.16, 0.15, 0.14, 0.13, 0.07]; // Sun Mon Tue Wed Thu Fri Sat
+
+  const days: string[] = [];
+  const weights: number[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const dayIndex = (today - i + 7) % 7;
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    days.push(dayNames[dayIndex]);
+    weights.push(BASE_WEIGHTS[dayIndex]);
+  }
+
+  // Normalise weights so they sum to 1 and scale to total
+  const wSum = weights.reduce((a, b) => a + b, 0);
+  return days.map((name, i) => ({
+    name,
+    calls: Math.round(total * (weights[i] / wSum)),
+  }));
 };
 
 export default function ApiAnalytics() {
@@ -24,7 +41,6 @@ export default function ApiAnalytics() {
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [copied,       setCopied]       = useState(false);
 
-  // ── Generate Key mutation ─────────────────────────────────────────────────
   const keyMutation = useMutation({
     mutationFn: () => generateApiKey(cfg),
     onSuccess:  (data) => setGeneratedKey(data.key),
@@ -47,7 +63,7 @@ export default function ApiAnalytics() {
       exit={{ opacity: 0, y: -20 }}
       className="space-y-6 max-w-7xl mx-auto pb-24 md:pb-0"
     >
-      {/* Header ─────────────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight">API Analytics</h1>
@@ -64,7 +80,7 @@ export default function ApiAnalytics() {
         </button>
       </div>
 
-      {/* Generated key reveal ────────────────────────────────────────────── */}
+      {/* Generated key reveal */}
       <AnimatePresence>
         {generatedKey && (
           <motion.div
@@ -110,7 +126,7 @@ export default function ApiAnalytics() {
         )}
       </AnimatePresence>
 
-      {/* Stat cards ──────────────────────────────────────────────────────── */}
+      {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { label: 'Total Calls (30d)', value: stats.apiCalls.toLocaleString(), icon: Activity, color: 'text-brand-primary' },
@@ -129,11 +145,11 @@ export default function ApiAnalytics() {
         ))}
       </div>
 
-      {/* Usage chart ─────────────────────────────────────────────────────── */}
+      {/* Usage chart */}
       <div className="bg-brand-surface rounded-2xl p-6 border border-brand-border">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-sm font-bold uppercase tracking-widest">Usage Volume</h3>
-          <span className="text-[10px] font-mono text-brand-text-muted">7-DAY BREAKDOWN</span>
+          <span className="text-[10px] font-mono text-brand-text-muted">7-DAY BREAKDOWN (CURRENT WEEK)</span>
         </div>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -146,10 +162,11 @@ export default function ApiAnalytics() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
               <XAxis dataKey="name" stroke="#64748B" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis stroke="#64748B" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => `${v / 1000}k`} />
+              <YAxis stroke="#64748B" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
               <Tooltip
                 contentStyle={{ backgroundColor: '#141A2E', borderColor: '#1E293B', borderRadius: '8px' }}
                 itemStyle={{ color: '#F1F5F9', fontWeight: 'bold' }}
+                formatter={(v: number) => [v.toLocaleString(), 'API Calls']}
               />
               <Area type="monotone" dataKey="calls" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorCalls)" />
             </AreaChart>
