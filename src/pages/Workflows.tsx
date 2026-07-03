@@ -1,79 +1,120 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GitBranch, Play, CheckCircle2, CircleDashed, Server, Zap, Database, Globe, RefreshCcw, Brain, Image, Pause, Check } from 'lucide-react';
+import { GitBranch, Play, CheckCircle2, CircleDashed, Server, Zap, Database, Globe, RefreshCcw, Brain, Image, Pause, Check, Loader2 } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
+import { useStore } from '../store/useStore';
+import { fetchWorkflowStatus, pauseWorkflow, resumeWorkflow } from '../lib/api';
+
+type StepStatus = 'completed' | 'running' | 'pending' | 'error';
+interface Step { id: string; label: string; status: StepStatus; icon: React.ElementType; time: string; }
+
+const INITIAL_STEPS: Step[] = [
+  { id: 'topic',     label: 'Select Topic',       status: 'completed', icon: Database, time: '12ms'          },
+  { id: 'generate',  label: 'Generate Content',    status: 'completed', icon: Brain,    time: '1.4s'          },
+  { id: 'render',    label: 'Render Card',         status: 'running',   icon: Image,    time: 'In progress…'  },
+  { id: 'publish',   label: 'Publish to Social',   status: 'pending',   icon: Globe,    time: '--'            },
+  { id: 'analytics', label: 'Record Analytics',    status: 'pending',   icon: Zap,      time: '--'            },
+  { id: 'event',     label: 'Emit Domain Event',   status: 'pending',   icon: Server,   time: '--'            },
+];
 
 export default function Workflows() {
+  const restEndpoint = useStore(state => state.restEndpoint);
+  const masterToken  = useStore(state => state.masterToken);
+  const cfg = { restEndpoint, masterToken };
+
   const [jobStatus, setJobStatus] = useState<'Running' | 'Paused' | 'Completed'>('Running');
-  const [progress, setProgress] = useState(45);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [progress,  setProgress]  = useState(45);
+  const [steps,     setSteps]     = useState<Step[]>(INITIAL_STEPS);
+  const [toast,     setToast]     = useState<string | null>(null);
 
-  const [steps, setSteps] = useState([
-    { id: 'topic', label: 'Select Topic', status: 'completed', icon: Database, time: '12ms' },
-    { id: 'generate', label: 'Generate Content', status: 'completed', icon: Brain, time: '1.4s' },
-    { id: 'render', label: 'Render Card', status: 'running', icon: Image, time: 'In progress...' },
-    { id: 'publish', label: 'Publish to Social', status: 'pending', icon: Globe, time: '--' },
-    { id: 'analytics', label: 'Record Analytics', status: 'pending', icon: Zap, time: '--' },
-    { id: 'event', label: 'Emit Domain Event', status: 'pending', icon: Server, time: '--' },
-  ]);
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  // ── Live workflow status poll (3 s) ───────────────────────────────────────
+  const { data: liveStatus, refetch, isFetching } = useQuery({
+    queryKey: ['workflow-status', restEndpoint],
+    queryFn:  () => fetchWorkflowStatus(cfg),
+    refetchInterval: jobStatus === 'Running' ? 3_000 : false,
+    retry: 1,
+  });
+
+  // Sync UI from backend when data arrives
+  useEffect(() => {
+    if (!liveStatus) return;
+    setProgress(liveStatus.progress ?? progress);
+    if      (liveStatus.status === 'paused')  setJobStatus('Paused');
+    else if (liveStatus.status === 'running') setJobStatus('Running');
+
+    // Advance the matching step to 'running'
+    if (liveStatus.current_step) {
+      setSteps(prev => prev.map(s => ({
+        ...s,
+        status: s.id === liveStatus.current_step
+          ? 'running'
+          : prev.findIndex(x => x.id === liveStatus.current_step) > prev.findIndex(x => x.id === s.id)
+            ? 'completed'
+            : 'pending',
+      })));
+    }
+  }, [liveStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Pause mutation ─────────────────────────────────────────────────────────
+  const pauseMutation = useMutation({
+    mutationFn: () => pauseWorkflow(cfg),
+    onSuccess:  () => { setJobStatus('Paused');  showToast('Workflow paused.');   refetch(); },
+    onError:    ()  => { setJobStatus('Paused');  showToast('Workflow paused (local).'); },
+  });
+
+  // ── Resume mutation ────────────────────────────────────────────────────────
+  const resumeMutation = useMutation({
+    mutationFn: () => resumeWorkflow(cfg),
+    onSuccess:  () => { setJobStatus('Running'); showToast('Workflow resumed.');  refetch(); },
+    onError:    ()  => { setJobStatus('Running'); showToast('Workflow resumed (local).'); },
+  });
+
+  const toggleJobStatus = () => {
+    if (jobStatus === 'Running') pauseMutation.mutate();
+    else resumeMutation.mutate();
   };
 
   const handleRefreshState = () => {
-    // Advance progress or refresh state
-    if (progress < 90) {
-      setProgress(p => Math.min(100, p + 25));
-    } else {
-      setProgress(15);
-    }
-    showToast('Workflow telemetry state synchronized from core engine.');
-  };
-
-  const toggleJobStatus = () => {
-    if (jobStatus === 'Running') {
-      setJobStatus('Paused');
-      showToast('Workflow job paused.');
-    } else {
-      setJobStatus('Running');
-      showToast('Workflow job resumed.');
-    }
+    refetch();
+    showToast('Workflow telemetry refreshed from core engine.');
   };
 
   const handleStepClick = (stepId: string) => {
     setSteps(prev => prev.map(s => {
-      if (s.id === stepId) {
-        const nextStatus = s.status === 'pending' ? 'running' : s.status === 'running' ? 'completed' : 'pending';
-        return { ...s, status: nextStatus };
-      }
-      return s;
+      if (s.id !== stepId) return s;
+      const next: StepStatus = s.status === 'pending' ? 'running' : s.status === 'running' ? 'completed' : 'pending';
+      return { ...s, status: next };
     }));
     showToast(`Updated step state for ${stepId.toUpperCase()}`);
   };
 
+  const isToggling = pauseMutation.isPending || resumeMutation.isPending;
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="max-w-6xl mx-auto relative"
     >
-      {/* Toast Notification */}
+      {/* Toast ───────────────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {toastMessage && (
+        {toast && (
           <motion.div
+            key="toast"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             className="fixed top-20 right-8 z-50 bg-brand-primary text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-2 font-mono text-xs font-bold"
           >
-            <Check className="w-4 h-4" />
-            <span>{toastMessage}</span>
+            <Check className="w-4 h-4" /><span>{toast}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* Page header ─────────────────────────────────────────────────────── */}
       <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end space-y-4 sm:space-y-0">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center">
@@ -82,54 +123,69 @@ export default function Workflows() {
           </h1>
           <p className="text-brand-text-muted text-sm font-mono mt-1">AUTOMATION PIPELINE VISUALIZER</p>
         </div>
-        <button 
+        <button
           onClick={handleRefreshState}
-          className="bg-brand-surface border border-brand-border text-brand-text px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-brand-elevated transition-colors flex items-center shadow-sm"
+          disabled={isFetching}
+          className="bg-brand-surface border border-brand-border text-brand-text px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-brand-elevated transition-colors flex items-center shadow-sm disabled:opacity-60"
         >
-          <RefreshCcw className="w-4 h-4 mr-2 text-brand-primary" />
-          Refresh State
+          <RefreshCcw className={cn('w-4 h-4 mr-2 text-brand-primary', isFetching && 'animate-spin')} />
+          {isFetching ? 'Syncing…' : 'Refresh State'}
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* ── Pipeline visualizer ──────────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-brand-surface border border-brand-border rounded-2xl p-8 relative overflow-hidden">
-            {/* Background decorative grid */}
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiMzMzMiLz48L3N2Zz4=')] opacity-[0.03]"></div>
-            
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiMzMzMiLz48L3N2Zz4=')] opacity-[0.03]" />
+
             <div className="flex justify-between items-center mb-10 relative z-10 border-b border-brand-border pb-6">
               <div>
                 <div className="flex items-center space-x-3 mb-2">
                   <h2 className="text-lg font-bold text-brand-text uppercase tracking-widest">PostPublishWorkflow</h2>
                   <span className={cn(
-                    "px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border",
-                    jobStatus === 'Running' ? "bg-brand-primary/10 text-brand-primary border-brand-primary/20" : "bg-brand-warning/10 text-brand-warning border-brand-warning/20"
+                    'px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border',
+                    jobStatus === 'Running'
+                      ? 'bg-brand-primary/10 text-brand-primary border-brand-primary/20'
+                      : 'bg-brand-warning/10 text-brand-warning border-brand-warning/20'
                   )}>
                     {jobStatus}
                   </span>
+                  {liveStatus && (
+                    <span className="text-[10px] font-mono text-brand-success flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-success inline-block" />LIVE
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs font-mono text-brand-text-muted">Job ID: job_9283749283 | Trigger: Schedule (0 12 * * *)</p>
+                <p className="text-xs font-mono text-brand-text-muted">
+                  Job ID: job_9283749283 · Trigger: Schedule (0 12 * * *)
+                </p>
               </div>
-              <button 
+              <button
                 onClick={toggleJobStatus}
+                disabled={isToggling}
                 title={jobStatus === 'Running' ? 'Pause Execution' : 'Resume Execution'}
                 className={cn(
-                  "w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-md",
-                  jobStatus === 'Running' ? "bg-brand-danger/10 text-brand-danger border-brand-danger/20 hover:bg-brand-danger hover:text-white" : "bg-brand-success/10 text-brand-success border-brand-success/20 hover:bg-brand-success hover:text-white"
+                  'w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-md disabled:opacity-60',
+                  jobStatus === 'Running'
+                    ? 'bg-brand-danger/10 text-brand-danger border-brand-danger/20 hover:bg-brand-danger hover:text-white'
+                    : 'bg-brand-success/10 text-brand-success border-brand-success/20 hover:bg-brand-success hover:text-white'
                 )}
               >
-                {jobStatus === 'Running' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                {isToggling
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : jobStatus === 'Running'
+                    ? <Pause className="w-4 h-4" />
+                    : <Play className="w-4 h-4" />}
               </button>
             </div>
 
             <div className="relative z-10 pl-4 md:pl-12">
-              {/* Vertical connecting line */}
-              <div className="absolute left-8 md:left-16 top-6 bottom-6 w-[2px] bg-brand-border"></div>
-              
+              <div className="absolute left-8 md:left-16 top-6 bottom-6 w-[2px] bg-brand-border" />
               <div className="space-y-12">
-                {steps.map((step) => (
+                {steps.map(step => (
                   <div key={step.id} className="relative flex items-start group">
-                    {/* Status Indicator */}
+                    {/* Status indicator */}
                     <div className="absolute -left-4 md:-left-4 mt-1 bg-brand-surface">
                       {step.status === 'completed' && (
                         <div className="w-8 h-8 rounded-full bg-brand-success/10 border border-brand-success flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.2)]">
@@ -138,54 +194,56 @@ export default function Workflows() {
                       )}
                       {step.status === 'running' && (
                         <div className="w-8 h-8 rounded-full bg-brand-primary/10 border border-brand-primary flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.2)]">
-                          <div className="w-2 h-2 bg-brand-primary rounded-full animate-pulse"></div>
+                          <div className="w-2 h-2 bg-brand-primary rounded-full animate-pulse" />
                         </div>
                       )}
-                      {step.status === 'pending' && (
+                      {(step.status === 'pending' || step.status === 'error') && (
                         <div className="w-8 h-8 rounded-full bg-brand-bg border border-brand-border flex items-center justify-center">
                           <CircleDashed className="w-4 h-4 text-brand-text-muted" />
                         </div>
                       )}
                     </div>
 
-                    {/* Step Content */}
-                    <div 
+                    {/* Step card */}
+                    <div
                       onClick={() => handleStepClick(step.id)}
                       className={cn(
-                        "ml-10 md:ml-12 p-5 rounded-xl border w-full transition-all cursor-pointer",
-                        step.status === 'running' 
-                          ? "bg-brand-elevated border-brand-primary shadow-[0_0_20px_rgba(79,70,229,0.1)]" 
-                          : "bg-brand-bg border-brand-border opacity-70 group-hover:opacity-100 hover:border-brand-primary/40"
+                        'ml-10 md:ml-12 p-5 rounded-xl border w-full transition-all cursor-pointer',
+                        step.status === 'running'
+                          ? 'bg-brand-elevated border-brand-primary shadow-[0_0_20px_rgba(79,70,229,0.1)]'
+                          : 'bg-brand-bg border-brand-border opacity-70 group-hover:opacity-100 hover:border-brand-primary/40'
                       )}
                     >
                       <div className="flex justify-between items-center mb-3">
                         <div className="flex items-center space-x-3">
                           <step.icon className={cn(
-                            "w-5 h-5",
-                            step.status === 'completed' ? "text-brand-success" : step.status === 'running' ? "text-brand-primary" : "text-brand-text-muted"
+                            'w-5 h-5',
+                            step.status === 'completed' ? 'text-brand-success' :
+                            step.status === 'running'   ? 'text-brand-primary' :
+                                                         'text-brand-text-muted'
                           )} />
                           <h3 className={cn(
-                            "text-sm font-bold uppercase tracking-wider",
-                            step.status === 'pending' ? "text-brand-text-muted" : "text-brand-text"
+                            'text-sm font-bold uppercase tracking-wider',
+                            step.status === 'pending' ? 'text-brand-text-muted' : 'text-brand-text'
                           )}>
                             {step.label}
                           </h3>
                         </div>
                         <span className="text-[10px] font-mono text-brand-text-muted">{step.time}</span>
                       </div>
-                      
+
                       {step.status === 'running' && (
                         <div className="mt-4">
                           <div className="flex justify-between text-[10px] font-mono text-brand-text-muted mb-2">
-                            <span>Generating layout matrix...</span>
+                            <span>Generating layout matrix…</span>
                             <span>{progress}%</span>
                           </div>
                           <div className="w-full bg-brand-surface rounded-full h-1.5 overflow-hidden border border-brand-border">
-                            <div 
+                            <div
                               className="bg-brand-primary h-1.5 rounded-full relative transition-all duration-500"
                               style={{ width: `${progress}%` }}
                             >
-                              <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                              <div className="absolute inset-0 bg-white/20 animate-pulse" />
                             </div>
                           </div>
                         </div>
@@ -198,6 +256,7 @@ export default function Workflows() {
           </div>
         </div>
 
+        {/* ── Right column: workers + queue ────────────────────────────── */}
         <div className="space-y-6">
           <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
             <h2 className="text-sm font-bold uppercase tracking-widest flex items-center mb-6 text-brand-text border-b border-brand-border pb-4">
@@ -205,17 +264,19 @@ export default function Workflows() {
               Active Workers
             </h2>
             <div className="space-y-4">
-              {[1, 2, 3].map((worker) => (
+              {[1, 2, 3].map(worker => (
                 <div key={worker} className="flex items-center justify-between p-3 rounded-lg bg-brand-bg border border-brand-border">
                   <div className="flex items-center space-x-3">
                     <div className={cn(
-                      "w-2 h-2 rounded-full",
-                      worker === 1 ? "bg-brand-primary animate-pulse shadow-[0_0_8px_rgba(79,70,229,0.6)]" : "bg-brand-success"
-                    )}></div>
+                      'w-2 h-2 rounded-full',
+                      worker === 1 && jobStatus === 'Running'
+                        ? 'bg-brand-primary animate-pulse shadow-[0_0_8px_rgba(79,70,229,0.6)]'
+                        : 'bg-brand-success'
+                    )} />
                     <span className="text-xs font-mono font-bold">Worker_{worker}</span>
                   </div>
                   <span className="text-[10px] font-mono text-brand-text-muted uppercase">
-                    {worker === 1 ? 'Busy (Post)' : 'Idle'}
+                    {worker === 1 && jobStatus === 'Running' ? 'Busy (Post)' : 'Idle'}
                   </span>
                 </div>
               ))}

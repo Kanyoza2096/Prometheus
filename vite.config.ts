@@ -39,7 +39,7 @@ export default defineConfig(() => {
     server: {
       // Allow all Replit proxy hosts — the preview pane uses a proxied iframe
       // with a different origin, so a fixed hostname allowlist would break the preview.
-      allowedHosts: true,
+      allowedHosts: true as const,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify — file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

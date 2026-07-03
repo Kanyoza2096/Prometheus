@@ -1,41 +1,53 @@
-import { useEffect } from 'react';
+import React, { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import { supabase } from './lib/supabase';
 import Login from './pages/Login';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Posts from './pages/Posts';
-import ApiAnalytics from './pages/ApiAnalytics';
-import Guardian from './pages/Guardian';
-import Settings from './pages/Settings';
-import AIEngine from './pages/AIEngine';
-import PayloadInspector from './pages/PayloadInspector';
-import Workflows from './pages/Workflows';
-import PrometheusMetrics from './pages/PrometheusMetrics';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { SkeletonPage } from './components/Skeleton';
+
+// Route-level code splitting — each page is its own chunk loaded on demand.
+// This cuts initial bundle size significantly and gives Suspense a natural boundary.
+const Dashboard       = lazy(() => import('./pages/Dashboard'));
+const Posts           = lazy(() => import('./pages/Posts'));
+const ApiAnalytics    = lazy(() => import('./pages/ApiAnalytics'));
+const Guardian        = lazy(() => import('./pages/Guardian'));
+const Settings        = lazy(() => import('./pages/Settings'));
+const AIEngine        = lazy(() => import('./pages/AIEngine'));
+const PayloadInspector = lazy(() => import('./pages/PayloadInspector'));
+const Workflows       = lazy(() => import('./pages/Workflows'));
+const PrometheusMetrics = lazy(() => import('./pages/PrometheusMetrics'));
+
+/**
+ * Wraps each route in an ErrorBoundary + Suspense so that:
+ *  - A crash in one page never takes down the whole shell
+ *  - Skeleton placeholders show during lazy-load / data fetch
+ */
+function Page({ name, children }: { name: string; children: ReactNode }) {
+  return (
+    <ErrorBoundary name={name}>
+      <Suspense fallback={<SkeletonPage />}>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
 
 export default function App() {
   const isAuthenticated = useStore(state => state.isAuthenticated);
-  const login = useStore(state => state.login);
+  const login  = useStore(state => state.login);
   const logout = useStore(state => state.logout);
 
   useEffect(() => {
-    // Check active session
+    // Restore session on load
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        login();
-      }
+      if (session) login();
     });
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        login();
-      } else {
-        logout();
-      }
+    // Keep auth state in sync with Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) { login(); } else { logout(); }
     });
 
     return () => subscription.unsubscribe();
@@ -48,16 +60,16 @@ export default function App() {
           <Route path="*" element={<Login />} />
         ) : (
           <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="posts" element={<Posts />} />
-            <Route path="workflows" element={<Workflows />} />
-            <Route path="engine" element={<AIEngine />} />
-            <Route path="payloads" element={<PayloadInspector />} />
-            <Route path="api" element={<ApiAnalytics />} />
-            <Route path="prometheus" element={<PrometheusMetrics />} />
-            <Route path="guardian" element={<Guardian />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route index            element={<Page name="Dashboard">        <Dashboard />        </Page>} />
+            <Route path="posts"     element={<Page name="Posts">            <Posts />            </Page>} />
+            <Route path="workflows" element={<Page name="Workflows">        <Workflows />        </Page>} />
+            <Route path="engine"    element={<Page name="AI Engine">        <AIEngine />         </Page>} />
+            <Route path="payloads"  element={<Page name="Payload Inspector"><PayloadInspector /> </Page>} />
+            <Route path="api"       element={<Page name="API Analytics">    <ApiAnalytics />     </Page>} />
+            <Route path="prometheus"element={<Page name="Prometheus">       <PrometheusMetrics /></Page>} />
+            <Route path="guardian"  element={<Page name="Guardian">         <Guardian />         </Page>} />
+            <Route path="settings"  element={<Page name="Settings">         <Settings />         </Page>} />
+            <Route path="*"         element={<Navigate to="/" replace />} />
           </Route>
         )}
       </Routes>
