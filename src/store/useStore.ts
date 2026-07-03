@@ -134,13 +134,17 @@ export const useStore = create<AppState>((set, get) => ({
   restEndpoint: localStorage.getItem('rest_endpoint') || import.meta.env.VITE_REST_ENDPOINT || 'https://kanyoza-systems-bot.onrender.com/api/v1',
   masterToken: localStorage.getItem('master_token') || import.meta.env.VITE_MASTER_TOKEN || 'sk_live_default_token',
   setConnectionParams: (params) => {
+    // Capture the previous endpoint BEFORE updating state so the comparison is valid
+    const previousWsEndpoint = get().wsEndpoint;
+
     if (params.wsEndpoint !== undefined) localStorage.setItem('ws_endpoint', params.wsEndpoint);
     if (params.restEndpoint !== undefined) localStorage.setItem('rest_endpoint', params.restEndpoint);
     if (params.masterToken !== undefined) localStorage.setItem('master_token', params.masterToken);
 
     set((state) => ({ ...state, ...params }));
-    // If wsEndpoint changed, reconnect socket
-    if (params.wsEndpoint && params.wsEndpoint !== get().wsEndpoint) {
+
+    // Reconnect socket only when the WebSocket URL actually changed
+    if (params.wsEndpoint && params.wsEndpoint !== previousWsEndpoint) {
       get().disconnectSocket();
       get().connectSocket();
     }
@@ -179,15 +183,14 @@ export const useStore = create<AppState>((set, get) => ({
   connectSocket: () => {
     if (get().socket) return;
     
-    // Connect to backend with auth token
+    // Connect to backend with auth token.
+    // Token is passed only in the auth payload (server-side handshake), NOT in query params
+    // which would expose it in URLs, server logs, and infrastructure observability tooling.
     const socket = io(get().wsEndpoint, {
       transports: ['websocket'],
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       auth: {
-        token: get().masterToken
-      },
-      query: {
         token: get().masterToken
       }
     });

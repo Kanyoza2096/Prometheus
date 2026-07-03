@@ -51,7 +51,7 @@ export default function AIEngine() {
             exit={{ opacity: 0, y: -20 }}
             className="fixed top-20 right-8 z-50 bg-brand-primary text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-2 font-mono text-xs font-bold"
           >
-            <Check className="w-4 h-4 text-brand-success" />
+            <Check className="w-4 h-4 text-white" />
             <span>{toastMessage}</span>
           </motion.div>
         )}

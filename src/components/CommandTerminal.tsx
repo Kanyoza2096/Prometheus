@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Terminal as TerminalIcon, X, Maximize2, Minimize2, Cpu } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -73,27 +73,16 @@ export default function CommandTerminal() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleTerminal]);
 
-  useEffect(() => {
-    if (pendingCommand) {
-      if (!isTerminalOpen) toggleTerminal();
-      // small delay to let terminal mount/open before running
-      setTimeout(() => {
-        handleCommand(pendingCommand);
-        setPendingCommand(null);
-      }, 300);
-    }
-  }, [pendingCommand, isTerminalOpen, toggleTerminal, setPendingCommand]);
-
-  const addLog = (type: LogLine['type'], content: string) => {
+  const addLog = useCallback((type: LogLine['type'], content: string) => {
     setHistory(prev => [...prev, {
       id: Math.random().toString(36).substr(2, 9),
       timestamp: new Date(),
       type,
       content
     }]);
-  };
+  }, []);
 
-  const handleCommand = (cmd: string) => {
+  const handleCommand = useCallback((cmd: string) => {
     const trimmedCmd = cmd.trim();
     if (!trimmedCmd) return;
 
@@ -172,7 +161,20 @@ export default function CommandTerminal() {
           addLog('error', `Command not found: ${mainCommand}. Type "/help" for a list of owner commands.`);
       }
     }, 100);
-  };
+  }, [addLog, healthMatrix]);
+
+  // Handle pending commands dispatched from the FAB or other components
+  // Placed after handleCommand declaration to avoid "used before declaration" TS errors
+  useEffect(() => {
+    if (pendingCommand) {
+      if (!isTerminalOpen) toggleTerminal();
+      // small delay to let terminal mount/open before running
+      setTimeout(() => {
+        handleCommand(pendingCommand);
+        setPendingCommand(null);
+      }, 300);
+    }
+  }, [pendingCommand, isTerminalOpen, toggleTerminal, setPendingCommand, handleCommand]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

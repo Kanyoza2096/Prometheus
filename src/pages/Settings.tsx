@@ -268,8 +268,8 @@ export default function Settings() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-2 flex justify-between items-center">
-                  <span>Master API Token</span>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="block text-xs font-bold text-brand-text-muted uppercase tracking-wider">Master API Token</span>
                   <button 
                     onClick={() => {
                       const token = 'sk_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -279,11 +279,11 @@ export default function Settings() {
                         input.type = 'text';
                       }
                     }}
-                    className="text-brand-primary hover:text-white transition-colors"
+                    className="text-brand-primary hover:text-white transition-colors text-xs font-bold uppercase tracking-wider"
                   >
                     Generate New
                   </button>
-                </label>
+                </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Key className="w-4 h-4 text-brand-text-muted" />

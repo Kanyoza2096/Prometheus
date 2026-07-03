@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useStore } from '../store/useStore';
 import { Network, Server, Database, BrainCircuit, Shield } from 'lucide-react';
@@ -25,17 +25,22 @@ export default function SystemTopology() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
-  const nodes: Node[] = [
+  // Memoize nodes/edges so they don't become new references on every render
+  // (which would cause the canvas useEffect to restart the animation loop each time)
+  // Node statuses are derived from healthMatrix service IDs to stay in sync with real backend telemetry:
+  // gemini → AI Orchestrator, supa → Supabase DB, fb → Social Plugins, play → Card Renderer, guard → Code Guardian
+  const nodes: Node[] = useMemo(() => [
     { id: 'flask', x: 12, y: 50, label: 'Flask WSGI', type: 'gateway', status: 'online' },
     { id: 'eventbus', x: 35, y: 50, label: 'Event Bus', type: 'core', status: 'online' },
     { id: 'aiorch', x: 62, y: 20, label: 'AI Orchestrator', type: 'ai', status: healthMatrix.find(h => h.id === 'gemini')?.status || 'online' },
     { id: 'workers', x: 62, y: 80, label: 'Task Queue', type: 'core', status: 'online' },
     { id: 'supa', x: 35, y: 85, label: 'Supabase DB', type: 'db', status: healthMatrix.find(h => h.id === 'supa')?.status || 'online' },
-    { id: 'renderer', x: 88, y: 70, label: 'Renderer', type: 'core', status: 'online' },
+    { id: 'renderer', x: 88, y: 70, label: 'Card Renderer', type: 'core', status: healthMatrix.find(h => h.id === 'play')?.status || 'online' },
     { id: 'plugins', x: 88, y: 30, label: 'Social Plugins', type: 'gateway', status: healthMatrix.find(h => h.id === 'fb')?.status || 'online' },
-  ];
+    { id: 'guardian', x: 12, y: 85, label: 'Code Guardian', type: 'security', status: healthMatrix.find(h => h.id === 'guard')?.status || 'online' },
+  ], [healthMatrix]);
 
-  const edges: Edge[] = [
+  const edges: Edge[] = useMemo(() => [
     { source: 'flask', target: 'eventbus', active: true },
     { source: 'eventbus', target: 'aiorch', active: true },
     { source: 'eventbus', target: 'workers', active: true },
@@ -43,7 +48,8 @@ export default function SystemTopology() {
     { source: 'workers', target: 'renderer', active: true },
     { source: 'workers', target: 'plugins', active: true },
     { source: 'aiorch', target: 'plugins', active: false },
-  ];
+    { source: 'flask', target: 'guardian', active: true },
+  ], []);
 
   useEffect(() => {
     const updateDimensions = () => {

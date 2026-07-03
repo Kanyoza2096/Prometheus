@@ -14,6 +14,7 @@ export default function Workflows() {
     { id: 'render', label: 'Render Card', status: 'running', icon: Image, time: 'In progress...' },
     { id: 'publish', label: 'Publish to Social', status: 'pending', icon: Globe, time: '--' },
     { id: 'analytics', label: 'Record Analytics', status: 'pending', icon: Zap, time: '--' },
+    { id: 'event', label: 'Emit Domain Event', status: 'pending', icon: Server, time: '--' },
   ]);
 
   const showToast = (msg: string) => {
@@ -236,4 +237,3 @@ export default function Workflows() {
     </motion.div>
   );
 }
-// Note: Icon Brain and Image need to be imported

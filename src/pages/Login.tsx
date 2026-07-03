@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfiguredFromEnv } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import ParticleBackground from '../components/ParticleBackground';
 import { Shield, Fingerprint, AlertCircle } from 'lucide-react';
@@ -20,21 +20,34 @@ export default function Login() {
     
     try {
       // Attempt Supabase login
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        // Fallback to local authentication for offline/preview environments
-        console.warn('Supabase auth failed, proceeding with operator credentials session:', error.message);
-        login();
+      if (authError) {
+        if (!isSupabaseConfiguredFromEnv()) {
+          // Supabase env vars not set at build time — allow local bypass for dev/preview environments
+          console.warn('Supabase not configured via env vars; using local session bypass for preview mode.');
+          login();
+          return;
+        }
+        // Supabase IS configured via env — surface the real auth error, do not bypass
+        setError(authError.message);
+        setIsShake(true);
+        setTimeout(() => setIsShake(false), 500);
         return;
       }
       login();
     } catch (err: any) {
-      // Graceful fallback to app session on credential error
-      login();
+      if (!isSupabaseConfiguredFromEnv()) {
+        // Network error and no build-time Supabase config — allow local bypass
+        login();
+      } else {
+        setError(err.message || 'Authentication failed. Please check your credentials.');
+        setIsShake(true);
+        setTimeout(() => setIsShake(false), 500);
+      }
     } finally {
       setLoading(false);
     }
