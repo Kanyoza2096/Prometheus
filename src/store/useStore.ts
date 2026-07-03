@@ -110,6 +110,9 @@ interface AppState {
   pendingCommand: string | null;
   setPendingCommand: (cmd: string | null) => void;
 
+  personaMood: 'analytical' | 'professional' | 'creative' | 'urgent';
+  setPersonaMood: (mood: AppState['personaMood']) => void;
+
   fetchInitialData: () => Promise<void>;
 }
 
@@ -374,6 +377,12 @@ export const useStore = create<AppState>((set, get) => ({
   toggleTerminal: () => set(state => ({ isTerminalOpen: !state.isTerminalOpen })),
   pendingCommand: null,
   setPendingCommand: (cmd) => set({ pendingCommand: cmd }),
+
+  personaMood: (localStorage.getItem('persona_mood') as AppState['personaMood']) || 'analytical',
+  setPersonaMood: (mood) => {
+    localStorage.setItem('persona_mood', mood);
+    set({ personaMood: mood });
+  },
 
   fetchInitialData: async () => {
     const { restEndpoint, masterToken } = get();

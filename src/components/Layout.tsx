@@ -29,7 +29,15 @@ export default function Layout() {
   const {
     logout, socketConnected, connectSocket, disconnectSocket,
     guardianAlerts, toggleTerminal, setPendingCommand, fetchInitialData, isUsingLiveBackendData,
+    personaMood,
   } = useStore();
+
+  const MOOD_META: Record<string, { emoji: string; color: string }> = {
+    analytical:   { emoji: '🧠', color: 'bg-brand-accent/10 text-brand-accent border-brand-accent/30' },
+    professional: { emoji: '💼', color: 'bg-brand-primary/10 text-brand-primary border-brand-primary/30' },
+    creative:     { emoji: '🎨', color: 'bg-brand-warning/10 text-brand-warning border-brand-warning/30' },
+    urgent:       { emoji: '⚡', color: 'bg-brand-danger/10 text-brand-danger border-brand-danger/30' },
+  };
 
   const [isMobileMenuOpen,    setIsMobileMenuOpen]    = useState(false);
   const [isFabOpen,           setIsFabOpen]           = useState(false);
@@ -176,6 +184,15 @@ export default function Layout() {
           </div>
 
           <div className="flex items-center space-x-4">
+            {/* Persona Mood badge */}
+            <div className={cn(
+              'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center border',
+              MOOD_META[personaMood]?.color
+            )}>
+              <span className="mr-1">{MOOD_META[personaMood]?.emoji}</span>
+              {personaMood}
+            </div>
+
             {/* Keyboard shortcuts hint */}
             <div className="relative">
               <button

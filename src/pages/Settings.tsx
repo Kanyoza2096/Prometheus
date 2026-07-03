@@ -1,15 +1,46 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Bell, Palette, HardDrive, Terminal, Key, Database, Globe, Check, X, Shield, Sliders, Download, Trash2, Info } from 'lucide-react';
+import { User, Bell, Palette, HardDrive, Terminal, Key, Database, Globe, Check, X, Shield, Sliders, Download, Trash2, Info, Brain } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
 
+const MOODS = [
+  {
+    id: 'analytical' as const,
+    label: 'Analytical',
+    emoji: '🧠',
+    desc: 'Data-driven, precise, methodical. Prioritises numbers and evidence.',
+    color: 'text-brand-accent border-brand-accent/40 bg-brand-accent/10',
+  },
+  {
+    id: 'professional' as const,
+    label: 'Professional',
+    emoji: '💼',
+    desc: 'Formal, authoritative tone. Structured communication style.',
+    color: 'text-brand-primary border-brand-primary/40 bg-brand-primary/10',
+  },
+  {
+    id: 'creative' as const,
+    label: 'Creative',
+    emoji: '🎨',
+    desc: 'Expressive, narrative-led. Crafts engaging social content.',
+    color: 'text-brand-warning border-brand-warning/40 bg-brand-warning/10',
+  },
+  {
+    id: 'urgent' as const,
+    label: 'Urgent',
+    emoji: '⚡',
+    desc: 'High-priority mode. Terse, direct, action-oriented outputs.',
+    color: 'text-brand-danger border-brand-danger/40 bg-brand-danger/10',
+  },
+] as const;
+
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<'general' | 'credentials'>('credentials');
-  const { 
-    wsEndpoint, 
-    restEndpoint, 
-    masterToken, 
+  const {
+    wsEndpoint,
+    restEndpoint,
+    masterToken,
     setConnectionParams,
     supabaseUrl,
     supabaseAnonKey,
@@ -21,7 +52,9 @@ export default function Settings() {
     fbVerifyToken,
     fbPageAccessToken,
     fbAppSecret,
-    setServiceKeys
+    setServiceKeys,
+    personaMood,
+    setPersonaMood,
   } = useStore();
   
   const [localWs, setLocalWs] = useState(wsEndpoint);
@@ -43,7 +76,9 @@ export default function Settings() {
   const [githubSyncStatus, setGithubSyncStatus] = useState<{ type: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ type: 'idle', message: '' });
 
   // Modal states
-  const [activeModal, setActiveModal] = useState<'profile' | 'alerts' | 'theme' | 'retention' | 'logs' | null>(null);
+  const [activeModal, setActiveModal] = useState<'profile' | 'alerts' | 'theme' | 'retention' | 'logs' | 'mood' | null>(null);
+  const [isMoodSaved, setIsMoodSaved] = useState(false);
+  const [pendingMood, setPendingMood] = useState(personaMood);
 
   // Profile data state
   const [profileName, setProfileName] = useState('Admin Alpha');
@@ -563,6 +598,7 @@ export default function Settings() {
             { id: 'profile', icon: User, title: 'Operator Profile', desc: `Manage access clearance (${profileName})` },
             { id: 'alerts', icon: Bell, title: 'Alert Routing', desc: `Webhook and notifications (${severityThreshold})` },
             { id: 'theme', icon: Palette, title: 'Interface Theme', desc: `Configure appearance settings (${themePreset})` },
+            { id: 'mood', icon: Brain, title: 'Persona Mood', desc: `AI response style: ${personaMood.charAt(0).toUpperCase() + personaMood.slice(1)}` },
             { id: 'retention', icon: HardDrive, title: 'Data Retention', desc: `Manage local storage and exports (${retentionDays}d)` },
             { id: 'logs', icon: Terminal, title: 'System Logs', desc: 'Raw telemetry and debug output console' },
           ].map((section) => (
@@ -611,6 +647,7 @@ export default function Settings() {
                     {activeModal === 'profile' && <User className="w-5 h-5" />}
                     {activeModal === 'alerts' && <Bell className="w-5 h-5" />}
                     {activeModal === 'theme' && <Palette className="w-5 h-5" />}
+                    {activeModal === 'mood' && <Brain className="w-5 h-5" />}
                     {activeModal === 'retention' && <HardDrive className="w-5 h-5" />}
                     {activeModal === 'logs' && <Terminal className="w-5 h-5" />}
                   </span>
@@ -619,6 +656,7 @@ export default function Settings() {
                       {activeModal === 'profile' && 'Operator Profile'}
                       {activeModal === 'alerts' && 'Alert Routing'}
                       {activeModal === 'theme' && 'Interface Theme'}
+                      {activeModal === 'mood' && 'Persona Mood'}
                       {activeModal === 'retention' && 'Data Retention'}
                       {activeModal === 'logs' && 'System Telemetry'}
                     </h2>
@@ -738,7 +776,42 @@ export default function Settings() {
                   </div>
                 )}
 
-                {/* 3. Theme Modal */}
+                {/* 3. Mood Modal */}
+                {activeModal === 'mood' && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-brand-text-muted leading-relaxed">
+                      Select the AI persona mode for this session. The selected mood shapes how the engine frames responses, generates posts, and prioritises information.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {MOODS.map((mood) => (
+                        <button
+                          key={mood.id}
+                          type="button"
+                          onClick={() => setPendingMood(mood.id)}
+                          className={cn(
+                            "p-4 rounded-xl border text-left transition-all",
+                            pendingMood === mood.id
+                              ? mood.color + ' ring-1 ring-current'
+                              : "bg-brand-bg border-brand-border text-brand-text-muted hover:border-brand-text-muted"
+                          )}
+                        >
+                          <div className="text-xl mb-2">{mood.emoji}</div>
+                          <div className="text-xs font-bold uppercase tracking-wider mb-1">{mood.label}</div>
+                          <div className="text-[10px] leading-relaxed opacity-80">{mood.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {pendingMood !== personaMood && (
+                      <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-brand-primary/10 border border-brand-primary/20 text-[11px] text-brand-primary font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse inline-block" />
+                        <span>Unsaved change — click Apply Mood to confirm.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. Theme Modal */}
                 {activeModal === 'theme' && (
                   <div className="space-y-4">
                     <div>
@@ -921,16 +994,23 @@ export default function Settings() {
                       if (activeModal === 'profile') saveProfile();
                       if (activeModal === 'alerts') saveAlerts();
                       if (activeModal === 'theme') saveTheme();
+                      if (activeModal === 'mood') {
+                        setPersonaMood(pendingMood);
+                        setIsMoodSaved(true);
+                        setTimeout(() => { setIsMoodSaved(false); setActiveModal(null); }, 900);
+                      }
                     }}
                     className="px-5 py-2 bg-brand-primary hover:bg-brand-primary/90 text-xs font-bold uppercase tracking-wider text-white rounded-lg transition-all shadow-glow-primary flex items-center cursor-pointer font-mono"
                   >
                     {activeModal === 'profile' && isProfileSaved && <Check className="w-4 h-4 mr-1.5 text-brand-success" />}
                     {activeModal === 'alerts' && isAlertsSaved && <Check className="w-4 h-4 mr-1.5 text-brand-success" />}
                     {activeModal === 'theme' && isThemeSaved && <Check className="w-4 h-4 mr-1.5 text-brand-success" />}
-                    
+                    {activeModal === 'mood' && isMoodSaved && <Check className="w-4 h-4 mr-1.5 text-brand-success" />}
+
                     {activeModal === 'profile' && (isProfileSaved ? 'Updating...' : 'Save Profile')}
                     {activeModal === 'alerts' && (isAlertsSaved ? 'Saving...' : 'Save Routing')}
                     {activeModal === 'theme' && (isThemeSaved ? 'Applying...' : 'Apply Theme')}
+                    {activeModal === 'mood' && (isMoodSaved ? 'Applied!' : 'Apply Mood')}
                   </button>
                 )}
               </div>
