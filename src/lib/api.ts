@@ -43,23 +43,28 @@ export interface StatsPayload {
   messages_today: number;
   posts_published: number;
   active_users: number;
-  api_calls: number;
-  uptime_seconds: number;
+  api_calls_today: number;
+  guardian_issues: number;
+  services: Record<string, boolean>;
 }
 export const fetchStats = (cfg: ApiConfig) =>
-  request<StatsPayload>(cfg, '/api/v1/stats');
+  request<StatsPayload>(cfg, '/api/v1/dashboard/live');
 
 // ── Health ────────────────────────────────────────────────────────────────────
 
-export interface ServiceHealth {
-  id: string;
-  name: string;
-  status: 'online' | 'degraded' | 'offline';
-  latency: number;
-  uptime: number;
+export interface ServiceHealthEntry {
+  status: 'ok' | 'error' | 'degraded';
+  latency_ms?: number;
+  page_name?: string;
+  reason?: string;
+}
+export interface HealthDeepPayload {
+  status: 'ok' | 'degraded' | 'error';
+  version: string;
+  services: Record<string, ServiceHealthEntry>;
 }
 export const fetchHealth = (cfg: ApiConfig) =>
-  request<ServiceHealth[]>(cfg, '/api/v1/health');
+  request<HealthDeepPayload>(cfg, '/api/v1/health/deep');
 
 // ── AI Persona ────────────────────────────────────────────────────────────────
 

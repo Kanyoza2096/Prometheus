@@ -41,7 +41,7 @@ function deriveStatus(httpCode: number | null, latencyMs: number | null): { stat
 async function pingBackend(signal: AbortSignal): Promise<{ httpCode: number | null; latencyMs: number }> {
   const t0 = performance.now();
   try {
-    const res = await fetch(`${BACKEND_URL}/api/v1/health`, {
+    const res = await fetch(`${BACKEND_URL}/api/v1/status`, {
       method: 'GET',
       signal,
       cache: 'no-store',
@@ -106,7 +106,7 @@ export default function BackendStatusCard() {
     abortRef.current = ac;
     const timeout = setTimeout(() => ac.abort(), WAKE_TIMEOUT_MS);
     try {
-      await fetch(`${BACKEND_URL}/api/v1/health`, {
+      await fetch(`${BACKEND_URL}/api/v1/status`, {
         method: 'GET',
         signal: ac.signal,
         cache: 'no-store',

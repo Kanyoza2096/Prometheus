@@ -448,12 +448,18 @@ export const useStore = create<AppState>((set, get) => ({
           headers['x-api-key'] = masterToken;
         }
 
-        // Try fetching stats
-        const statsRes = await fetch(`${baseUrl}/stats`, { headers }).catch(() => null);
+        // Try fetching live stats from real endpoint
+        const statsRes = await fetch(`${baseUrl}/dashboard/live`, { headers }).catch(() => null);
         if (statsRes && statsRes.ok) {
-          const statsData = await statsRes.json();
-          if (statsData) {
-            get().updateStats(statsData);
+          const d = await statsRes.json();
+          if (d) {
+            get().updateStats({
+              messagesToday:  d.messages_today   ?? 0,
+              postsPublished: d.posts_published  ?? 0,
+              activeUsers:    d.active_users      ?? 0,
+              apiCalls:       d.api_calls_today   ?? 0,
+              guardianIssues: d.guardian_issues   ?? 0,
+            });
             loadedLive = true;
           }
         }
@@ -488,12 +494,20 @@ export const useStore = create<AppState>((set, get) => ({
           }
         }
 
-        // Try fetching health matrix
-        const healthRes = await fetch(`${baseUrl}/health`, { headers }).catch(() => null);
+        // Try fetching health matrix from /health/deep (returns object, not array)
+        const healthRes = await fetch(`${baseUrl}/health/deep`, { headers }).catch(() => null);
         if (healthRes && healthRes.ok) {
           const healthData = await healthRes.json();
-          if (Array.isArray(healthData) && healthData.length > 0) {
-            set({ healthMatrix: healthData });
+          if (healthData?.services && typeof healthData.services === 'object') {
+            const matrix: SystemHealth[] = Object.entries(healthData.services).map(([name, svc]: [string, any]) => ({
+              id:           name,
+              name:         svc.page_name || name.charAt(0).toUpperCase() + name.slice(1),
+              status:       svc.status === 'ok' ? 'online' : svc.status === 'degraded' ? 'degraded' : 'offline',
+              latency:      svc.latency_ms ?? 0,
+              lastChecked:  Date.now(),
+              uptime:       svc.status === 'ok' ? 99.9 : svc.status === 'degraded' ? 85.0 : 0,
+            }));
+            set({ healthMatrix: matrix });
             loadedLive = true;
           }
         }

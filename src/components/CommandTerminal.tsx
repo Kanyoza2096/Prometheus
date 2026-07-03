@@ -173,9 +173,9 @@ export default function CommandTerminal() {
         case '/ping': {
           const base = restEndpoint.replace(/\/+$/, '');
           const target = base || 'https://kanyoza-systems-bot.onrender.com';
-          addLog('info', `Pinging REST endpoint: ${target}/api/v1/health`);
+          addLog('info', `Pinging REST endpoint: ${target}/api/v1/status`);
           const t0 = performance.now();
-          fetch(`${target}/api/v1/health`, {
+          fetch(`${target}/api/v1/status`, {
             method: 'GET',
             headers: { Authorization: `Bearer ${masterToken}` },
             signal: AbortSignal.timeout(5000),
