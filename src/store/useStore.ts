@@ -192,10 +192,18 @@ export const useStore = create<AppState>((set, get) => ({
     // Connect to backend with auth token.
     // Token is passed only in the auth payload (server-side handshake), NOT in query params
     // which would expose it in URLs, server logs, and infrastructure observability tooling.
-    const socket = io(get().wsEndpoint, {
-      transports: ['websocket'],
+    // Connect to the /dashboard namespace registered on the backend.
+    // Use polling first so the connection works even when gunicorn runs
+    // a sync worker (sync workers cannot upgrade HTTP→WebSocket).
+    // Socket.IO will automatically upgrade to WebSocket once the
+    // eventlet/gevent worker is in place on the backend.
+    const base = get().wsEndpoint.replace(/\/+$/, '');
+    const socket = io(`${base}/dashboard`, {
+      transports: ['polling', 'websocket'],
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionDelayMax: 10000,
+      reconnectionAttempts: Infinity,
+      timeout: 20000,
       auth: {
         token: get().masterToken
       }
