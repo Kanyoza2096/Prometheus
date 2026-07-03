@@ -210,7 +210,7 @@ export default function PayloadInspector() {
           <button
             onClick={handleSimulateWebhook}
             className="flex items-center space-x-2 px-4 py-2 bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/30 rounded-xl text-brand-primary text-xs font-bold uppercase tracking-wider transition-all"
-            title="Inject a mock transaction payload to test real-time bindings"
+            title="Inject a live transaction payload to test real-time bindings"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Simulate Traffic</span>

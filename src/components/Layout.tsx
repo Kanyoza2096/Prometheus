@@ -23,6 +23,7 @@ import {
 import { cn } from '../lib/utils';
 import CommandTerminal from './CommandTerminal';
 import CommandPalette from './CommandPalette';
+import { ConnectionOrb, ConnectionBadge } from './ConnectionOrb';
 import { supabase } from '../lib/supabase';
 
 export default function Layout() {
@@ -140,18 +141,12 @@ export default function Layout() {
         </div>
 
         <div className="p-4 border-t border-brand-border">
-          <div className="flex items-center justify-between mb-4 px-2">
-            <div className="flex items-center space-x-2">
-              <div className={cn(
-                'w-2 h-2 rounded-full',
-                socketConnected
-                  ? 'bg-brand-success animate-pulse shadow-glow-success'
-                  : 'bg-brand-danger shadow-glow-danger'
-              )} />
-              <span className="text-xs font-mono text-brand-text-muted uppercase">
-                {socketConnected ? 'Uplink Active' : 'Uplink Offline'}
-              </span>
-            </div>
+          {/* Beautiful spinning connection orb */}
+          <div className="flex flex-col items-center py-3 mb-2">
+            <ConnectionOrb
+              socketConnected={socketConnected}
+              isUsingLiveBackendData={isUsingLiveBackendData}
+            />
           </div>
           <button
             onClick={handleLogout}
@@ -172,15 +167,10 @@ export default function Layout() {
               <span className="text-brand-primary mr-2">SYS_TIME:</span>
               <span className="tabular-nums">{clockTime} UTC</span>
             </div>
-            <div className={cn(
-              'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center border',
-              isUsingLiveBackendData
-                ? 'bg-brand-success/10 text-brand-success border-brand-success/30'
-                : 'bg-brand-accent/10 text-brand-accent border-brand-accent/30'
-            )}>
-              <span className={cn('w-1.5 h-1.5 rounded-full mr-1.5', isUsingLiveBackendData ? 'bg-brand-success animate-pulse' : 'bg-brand-accent')} />
-              {isUsingLiveBackendData ? 'Live Database Active' : 'Fallback Mock Data'}
-            </div>
+            <ConnectionBadge
+              socketConnected={socketConnected}
+              isUsingLiveBackendData={isUsingLiveBackendData}
+            />
           </div>
 
           <div className="flex items-center space-x-4">
