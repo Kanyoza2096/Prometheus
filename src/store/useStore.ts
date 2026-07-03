@@ -1,0 +1,430 @@
+import { create } from 'zustand';
+import { io, Socket } from 'socket.io-client';
+
+export type ServiceStatus = 'online' | 'degraded' | 'offline';
+
+export interface SystemHealth {
+  id: string;
+  name: string;
+  status: ServiceStatus;
+  latency: number;
+  lastChecked: number;
+  uptime: number;
+}
+
+export interface LiveMessage {
+  id: string;
+  user: string;
+  avatar: string;
+  message: string;
+  time: number;
+  sentiment: 'positive' | 'neutral' | 'negative';
+}
+
+export interface GuardianAlert {
+  id: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
+  title: string;
+  time: number;
+}
+
+export interface Post {
+  id: string;
+  title: string;
+  platform: 'facebook' | 'twitter' | 'linkedin';
+  time: number;
+  engagement: number;
+  thumbnail: string;
+}
+
+export interface PayloadLog {
+  id: string;
+  time: string;
+  method: string;
+  endpoint: string;
+  status: number;
+  latency: string;
+  type: 'inbound' | 'outbound';
+  request: any;
+  response: any;
+}
+
+interface AppState {
+  isAuthenticated: boolean;
+  login: () => void;
+  logout: () => void;
+  
+  wsEndpoint: string;
+  restEndpoint: string;
+  masterToken: string;
+  setConnectionParams: (params: { wsEndpoint?: string; restEndpoint?: string; masterToken?: string }) => void;
+
+  geminiKey: string;
+  fbPageId: string;
+  fbVerifyToken: string;
+  fbPageAccessToken: string;
+  fbAppSecret: string;
+  setServiceKeys: (keys: { geminiKey?: string; fbPageId?: string; fbVerifyToken?: string; fbPageAccessToken?: string; fbAppSecret?: string }) => void;
+
+  socket: Socket | null;
+  socketConnected: boolean;
+  connectSocket: () => void;
+  disconnectSocket: () => void;
+
+  messages: LiveMessage[];
+  addMessage: (msg: LiveMessage) => void;
+  isStreamPaused: boolean;
+  setStreamPaused: (paused: boolean) => void;
+
+  healthMatrix: SystemHealth[];
+  updateHealth: (health: SystemHealth[]) => void;
+
+  guardianAlerts: GuardianAlert[];
+  addAlert: (alert: GuardianAlert) => void;
+
+  recentPosts: Post[];
+  addPost: (post: Post) => void;
+
+  payloads: PayloadLog[];
+  addPayload: (payload: PayloadLog) => void;
+
+  stats: {
+    messagesToday: number;
+    postsPublished: number;
+    activeUsers: number;
+    apiCalls: number;
+    guardianIssues: number;
+    revenueMonthly: number;
+  };
+  updateStats: (partial: Partial<AppState['stats']>) => void;
+
+  isTerminalOpen: boolean;
+  toggleTerminal: () => void;
+  pendingCommand: string | null;
+  setPendingCommand: (cmd: string | null) => void;
+
+  fetchInitialData: () => Promise<void>;
+}
+
+const INITIAL_HEALTH: SystemHealth[] = [
+  { id: 'gemini', name: 'Gemini AI', status: 'online', latency: 45, lastChecked: Date.now(), uptime: 99.99 },
+  { id: 'fb', name: 'Facebook API', status: 'online', latency: 120, lastChecked: Date.now(), uptime: 99.95 },
+  { id: 'supa', name: 'Supabase', status: 'online', latency: 15, lastChecked: Date.now(), uptime: 100 },
+  { id: 'mwk', name: 'MWK Converter', status: 'degraded', latency: 850, lastChecked: Date.now(), uptime: 98.5 },
+  { id: 'play', name: 'Playwright', status: 'online', latency: 320, lastChecked: Date.now(), uptime: 99.1 },
+  { id: 'guard', name: 'Code Guardian', status: 'online', latency: 85, lastChecked: Date.now(), uptime: 100 },
+];
+
+export const useStore = create<AppState>((set, get) => ({
+  isAuthenticated: false, // Set to true to skip login during dev if needed
+  login: () => set({ isAuthenticated: true }),
+  logout: () => {
+    get().disconnectSocket();
+    set({ isAuthenticated: false });
+  },
+
+  wsEndpoint: localStorage.getItem('ws_endpoint') || import.meta.env.VITE_WS_ENDPOINT || 'wss://kanyoza-systems-bot.onrender.com',
+  restEndpoint: localStorage.getItem('rest_endpoint') || import.meta.env.VITE_REST_ENDPOINT || 'https://kanyoza-systems-bot.onrender.com/api/v1',
+  masterToken: localStorage.getItem('master_token') || import.meta.env.VITE_MASTER_TOKEN || 'sk_live_default_token',
+  setConnectionParams: (params) => {
+    if (params.wsEndpoint !== undefined) localStorage.setItem('ws_endpoint', params.wsEndpoint);
+    if (params.restEndpoint !== undefined) localStorage.setItem('rest_endpoint', params.restEndpoint);
+    if (params.masterToken !== undefined) localStorage.setItem('master_token', params.masterToken);
+
+    set((state) => ({ ...state, ...params }));
+    // If wsEndpoint changed, reconnect socket
+    if (params.wsEndpoint && params.wsEndpoint !== get().wsEndpoint) {
+      get().disconnectSocket();
+      get().connectSocket();
+    }
+  },
+
+  geminiKey: localStorage.getItem('gemini_key') || '',
+  fbPageId: localStorage.getItem('fb_page_id') || '',
+  fbVerifyToken: localStorage.getItem('fb_verify_token') || '',
+  fbPageAccessToken: localStorage.getItem('fb_page_access_token') || '',
+  fbAppSecret: localStorage.getItem('fb_app_secret') || '',
+  setServiceKeys: (keys) => {
+    if (keys.geminiKey !== undefined) localStorage.setItem('gemini_key', keys.geminiKey);
+    if (keys.fbPageId !== undefined) localStorage.setItem('fb_page_id', keys.fbPageId);
+    if (keys.fbVerifyToken !== undefined) localStorage.setItem('fb_verify_token', keys.fbVerifyToken);
+    if (keys.fbPageAccessToken !== undefined) localStorage.setItem('fb_page_access_token', keys.fbPageAccessToken);
+    if (keys.fbAppSecret !== undefined) localStorage.setItem('fb_app_secret', keys.fbAppSecret);
+
+    set((state) => ({ ...state, ...keys }));
+  },
+
+  socket: null,
+  socketConnected: false,
+  connectSocket: () => {
+    if (get().socket) return;
+    
+    // Connect to backend with auth token
+    const socket = io(get().wsEndpoint, {
+      transports: ['websocket'],
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      auth: {
+        token: get().masterToken
+      },
+      query: {
+        token: get().masterToken
+      }
+    });
+
+    socket.on('connect', () => set({ socketConnected: true }));
+    socket.on('disconnect', () => set({ socketConnected: false }));
+    
+    socket.on('new_message', (msg: LiveMessage) => {
+      if (!get().isStreamPaused) {
+        get().addMessage(msg);
+      }
+      set(state => ({ stats: { ...state.stats, messagesToday: state.stats.messagesToday + 1 } }));
+    });
+
+    socket.on('post_published', (post: Post) => {
+      get().addPost(post);
+      set(state => ({ stats: { ...state.stats, postsPublished: state.stats.postsPublished + 1 } }));
+    });
+
+    socket.on('api_call', (data?: any) => {
+       set(state => ({ stats: { ...state.stats, apiCalls: state.stats.apiCalls + 1 } }));
+       if (data && typeof data === 'object') {
+         get().addPayload({
+           id: data.id || `req_${Math.floor(Math.random() * 900000 + 100000)}`,
+           time: data.time || new Date().toLocaleTimeString(),
+           method: data.method || 'POST',
+           endpoint: data.endpoint || '/api/v1/webhook',
+           status: data.status || 200,
+           latency: data.latency || `${Math.floor(Math.random() * 200 + 50)}ms`,
+           type: data.type || 'inbound',
+           request: data.request || {},
+           response: data.response || {}
+         });
+       }
+    });
+
+    socket.on('payload', (data?: any) => {
+       if (data && typeof data === 'object') {
+         get().addPayload(data);
+       }
+    });
+
+    socket.on('traffic', (data?: any) => {
+       if (data && typeof data === 'object') {
+         get().addPayload(data);
+       }
+    });
+
+    socket.on('service_status', (healthUpdates: SystemHealth[]) => {
+      get().updateHealth(healthUpdates);
+    });
+
+    socket.on('scan_complete', (alert: GuardianAlert) => {
+      get().addAlert(alert);
+      set(state => ({ stats: { ...state.stats, guardianIssues: state.stats.guardianIssues + 1 } }));
+    });
+
+    set({ socket });
+  },
+  disconnectSocket: () => {
+    const { socket } = get();
+    if (socket) {
+      socket.disconnect();
+      set({ socket: null, socketConnected: false });
+    }
+  },
+
+  messages: [],
+  addMessage: (msg) => set(state => ({ 
+    messages: [msg, ...state.messages].slice(0, 20) 
+  })),
+  isStreamPaused: false,
+  setStreamPaused: (paused) => set({ isStreamPaused: paused }),
+
+  healthMatrix: INITIAL_HEALTH,
+  updateHealth: (updates) => set(state => {
+    const newHealth = [...state.healthMatrix];
+    updates.forEach(u => {
+      const idx = newHealth.findIndex(h => h.id === u.id);
+      if (idx !== -1) newHealth[idx] = { ...newHealth[idx], ...u };
+    });
+    return { healthMatrix: newHealth };
+  }),
+
+  guardianAlerts: [
+    { id: '1', severity: 'HIGH', title: 'Unauthorized API Access Attempt', time: Date.now() - 3600000 },
+    { id: '2', severity: 'MEDIUM', title: 'MWK Converter Latency Spike', time: Date.now() - 7200000 },
+  ],
+  addAlert: (alert) => set(state => ({
+    guardianAlerts: [alert, ...state.guardianAlerts].slice(0, 50)
+  })),
+
+  recentPosts: [
+    { id: 'p1', title: 'AI Automation Trends 2026', platform: 'linkedin', time: Date.now() - 1000 * 60 * 30, engagement: 245, thumbnail: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=150&q=80' },
+    { id: 'p2', title: 'Malawi Tech Ecosystem Report', platform: 'twitter', time: Date.now() - 1000 * 60 * 120, engagement: 1042, thumbnail: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=150&q=80' },
+    { id: 'p3', title: 'New Command Center Launch', platform: 'facebook', time: Date.now() - 1000 * 60 * 60 * 5, engagement: 856, thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=150&q=80' }
+  ],
+  addPost: (post) => set(state => ({
+    recentPosts: [post, ...state.recentPosts].slice(0, 20)
+  })),
+
+  payloads: [
+    {
+      id: 'req_109283',
+      time: new Date(Date.now() - 30000).toLocaleTimeString(),
+      method: 'POST',
+      endpoint: 'graph.facebook.com/v19.0/me/messages',
+      status: 200,
+      latency: '145ms',
+      type: 'outbound',
+      request: {
+        messaging_type: "RESPONSE",
+        recipient: { id: "84759284759" },
+        message: { text: "We have received your query regarding the enterprise plan. A representative will connect shortly." }
+      },
+      response: {
+        recipient_id: "84759284759",
+        message_id: "m_029384092834"
+      }
+    },
+    {
+      id: 'req_109284',
+      time: new Date(Date.now() - 60000).toLocaleTimeString(),
+      method: 'POST',
+      endpoint: 'generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
+      status: 200,
+      latency: '1.2s',
+      type: 'outbound',
+      request: {
+        contents: [{ role: "user", parts: [{ text: "Extract sentiment and intent from: 'I need to upgrade my plan immediately, the current limits are blocking my team.'" }] }],
+        generationConfig: { temperature: 0.2 }
+      },
+      response: {
+        candidates: [{
+          content: { parts: [{ text: "{\n  \"sentiment\": \"urgent_positive\",\n  \"intent\": \"upgrade_subscription\"\n}" }] }
+        }]
+      }
+    },
+    {
+      id: 'req_109285',
+      time: new Date(Date.now() - 120000).toLocaleTimeString(),
+      method: 'POST',
+      endpoint: '/api/v1/webhook/facebook',
+      status: 400,
+      latency: '45ms',
+      type: 'inbound',
+      request: {
+        object: "page",
+        entry: [{
+          id: "10493819203",
+          time: 1718293840,
+          messaging: [{
+            sender: { id: "UNKNOWN_MALFORMED" }
+          }]
+        }]
+      },
+      response: {
+        error: "Malformed payload structure in messaging array."
+      }
+    }
+  ],
+  addPayload: (payload) => set(state => ({
+    payloads: [payload, ...state.payloads].slice(0, 50)
+  })),
+
+  stats: {
+    messagesToday: 14052,
+    postsPublished: 124,
+    activeUsers: 843,
+    apiCalls: 1045920,
+    guardianIssues: 2,
+    revenueMonthly: 45250,
+  },
+  updateStats: (partial) => set(state => ({ stats: { ...state.stats, ...partial } })),
+
+  isTerminalOpen: false,
+  toggleTerminal: () => set(state => ({ isTerminalOpen: !state.isTerminalOpen })),
+  pendingCommand: null,
+  setPendingCommand: (cmd) => set({ pendingCommand: cmd }),
+
+  fetchInitialData: async () => {
+    const { restEndpoint, masterToken } = get();
+    if (!restEndpoint) return;
+    try {
+      const baseUrl = restEndpoint.endsWith('/') ? restEndpoint.slice(0, -1) : restEndpoint;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (masterToken) {
+        headers['Authorization'] = `Bearer ${masterToken}`;
+        headers['X-API-Token'] = masterToken;
+        headers['x-api-key'] = masterToken;
+      }
+
+      // Try fetching stats
+      const statsRes = await fetch(`${baseUrl}/stats`, { headers }).catch(() => null);
+      if (statsRes && statsRes.ok) {
+        const statsData = await statsRes.json();
+        if (statsData) {
+          get().updateStats(statsData);
+        }
+      }
+
+      // Try fetching messages
+      const msgsRes = await fetch(`${baseUrl}/messages`, { headers }).catch(() => null);
+      if (msgsRes && msgsRes.ok) {
+        const msgsData = await msgsRes.json();
+        if (Array.isArray(msgsData)) {
+          set({ messages: msgsData });
+        }
+      }
+
+      // Try fetching posts
+      const postsRes = await fetch(`${baseUrl}/posts`, { headers }).catch(() => null);
+      if (postsRes && postsRes.ok) {
+        const postsData = await postsRes.json();
+        if (Array.isArray(postsData)) {
+          set({ recentPosts: postsData });
+        }
+      }
+
+      // Try fetching alerts
+      const alertsRes = await fetch(`${baseUrl}/alerts`, { headers }).catch(() => null);
+      if (alertsRes && alertsRes.ok) {
+        const alertsData = await alertsRes.json();
+        if (Array.isArray(alertsData)) {
+          set({ guardianAlerts: alertsData });
+        }
+      }
+
+      // Try fetching health matrix
+      const healthRes = await fetch(`${baseUrl}/health`, { headers }).catch(() => null);
+      if (healthRes && healthRes.ok) {
+        const healthData = await healthRes.json();
+        if (Array.isArray(healthData)) {
+          set({ healthMatrix: healthData });
+        }
+      }
+
+      // Try fetching payloads/logs/traffic from backend API
+      const payloadsRes = await fetch(`${baseUrl}/payloads`, { headers }).catch(() => null);
+      if (payloadsRes && payloadsRes.ok) {
+        const payloadsData = await payloadsRes.json();
+        if (Array.isArray(payloadsData) && payloadsData.length > 0) {
+          set({ payloads: payloadsData });
+        }
+      } else {
+        const logsRes = await fetch(`${baseUrl}/logs`, { headers }).catch(() => null);
+        if (logsRes && logsRes.ok) {
+          const logsData = await logsRes.json();
+          if (Array.isArray(logsData) && logsData.length > 0) {
+            set({ payloads: logsData });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch initial data from backend:', err);
+    }
+  },
+}));
