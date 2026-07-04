@@ -586,7 +586,7 @@ export const useStore = create<AppState>((set, get) => ({
       : {};
 
     // Fetch backend config immediately on startup
-    fetch(`${base}/api/v1/status`, { headers })
+    fetch(`${base}/status`, { headers })
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) set({ backendConfig: data }); })
       .catch(() => {});
@@ -595,8 +595,8 @@ export const useStore = create<AppState>((set, get) => ({
     const timer = setInterval(async () => {
       try {
         const [sr, hr] = await Promise.allSettled([
-          fetch(`${base}/api/v1/dashboard/live`, { headers }),
-          fetch(`${base}/api/v1/health/deep`,    { headers }),
+          fetch(`${base}/dashboard/live`, { headers }),
+          fetch(`${base}/health/deep`,    { headers }),
         ]);
         if (sr.status === 'fulfilled' && sr.value.ok) {
           const d = await sr.value.json();

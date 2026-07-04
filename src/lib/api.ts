@@ -48,7 +48,7 @@ export interface StatsPayload {
   services: Record<string, boolean>;
 }
 export const fetchStats = (cfg: ApiConfig) =>
-  request<StatsPayload>(cfg, '/api/v1/dashboard/live');
+  request<StatsPayload>(cfg, '/dashboard/live');
 
 // ── Health ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ export interface HealthDeepPayload {
   services: Record<string, ServiceHealthEntry>;
 }
 export const fetchHealth = (cfg: ApiConfig) =>
-  request<HealthDeepPayload>(cfg, '/api/v1/health/deep');
+  request<HealthDeepPayload>(cfg, '/health/deep');
 
 // ── Backend Status / Config ───────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ export interface StatusConfig {
   version: string;
 }
 export const fetchStatus = (cfg: ApiConfig) =>
-  request<StatusConfig>(cfg, '/api/v1/status');
+  request<StatusConfig>(cfg, '/status');
 
 // ── AI Persona ────────────────────────────────────────────────────────────────
 
@@ -96,10 +96,10 @@ export interface PersonaPayload {
   system_prompt: string;
 }
 export const fetchPersona = (cfg: ApiConfig) =>
-  request<PersonaPayload>(cfg, '/api/v1/ai/persona');
+  request<PersonaPayload>(cfg, '/ai/persona');
 
 export const applyPersona = (cfg: ApiConfig, payload: PersonaPayload) =>
-  request<{ ok: boolean }>(cfg, '/api/v1/ai/persona', {
+  request<{ ok: boolean }>(cfg, '/ai/persona', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -114,16 +114,16 @@ export interface WorkflowStatusPayload {
   current_step: string;
 }
 export const fetchWorkflowStatus = (cfg: ApiConfig) =>
-  request<WorkflowStatusPayload>(cfg, '/api/v1/workflow/status');
+  request<WorkflowStatusPayload>(cfg, '/workflow/status');
 
 export const pauseWorkflow = (cfg: ApiConfig) =>
-  request<{ ok: boolean }>(cfg, '/api/v1/workflow/pause', { method: 'POST' });
+  request<{ ok: boolean }>(cfg, '/workflow/pause', { method: 'POST' });
 
 export const resumeWorkflow = (cfg: ApiConfig) =>
-  request<{ ok: boolean }>(cfg, '/api/v1/workflow/resume', { method: 'POST' });
+  request<{ ok: boolean }>(cfg, '/workflow/resume', { method: 'POST' });
 
 export const triggerPost = (cfg: ApiConfig) =>
-  request<{ ok: boolean; job_id?: string }>(cfg, '/api/v1/workflow/trigger', {
+  request<{ ok: boolean; job_id?: string }>(cfg, '/workflow/trigger', {
     method: 'POST',
   });
 
@@ -140,7 +140,7 @@ export interface ScanResult {
   duration_ms: number;
 }
 export const triggerScan = (cfg: ApiConfig) =>
-  request<ScanResult>(cfg, '/api/v1/guardian/scan', { method: 'POST' });
+  request<ScanResult>(cfg, '/guardian/scan', { method: 'POST' });
 
 // ── Metrics (Prometheus) ──────────────────────────────────────────────────────
 
@@ -155,7 +155,7 @@ export interface MetricsPayload {
   error_rate: MetricPoint[];
 }
 export const fetchMetrics = (cfg: ApiConfig) =>
-  request<MetricsPayload>(cfg, '/api/v1/metrics');
+  request<MetricsPayload>(cfg, '/metrics');
 
 // ── Resources ─────────────────────────────────────────────────────────────────
 
@@ -169,7 +169,7 @@ export interface ResourcePayload {
   queue_depth: number;
 }
 export const fetchResources = (cfg: ApiConfig) =>
-  request<ResourcePayload>(cfg, '/api/v1/metrics/resources');
+  request<ResourcePayload>(cfg, '/metrics/resources');
 
 // ── API Key management ────────────────────────────────────────────────────────
 
@@ -179,7 +179,7 @@ export interface GeneratedKey {
   label: string;
 }
 export const generateApiKey = (cfg: ApiConfig) =>
-  request<GeneratedKey>(cfg, '/api/v1/keys/generate', { method: 'POST' });
+  request<GeneratedKey>(cfg, '/keys/generate', { method: 'POST' });
 
 // ── PromQL execution ──────────────────────────────────────────────────────────
 
@@ -189,4 +189,4 @@ export interface PromQLResult {
   error?: string;
 }
 export const executePromQL = (cfg: ApiConfig, query: string) =>
-  request<PromQLResult>(cfg, `/api/v1/metrics/query?q=${encodeURIComponent(query)}`);
+  request<PromQLResult>(cfg, `/metrics/query?q=${encodeURIComponent(query)}`);
