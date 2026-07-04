@@ -26,8 +26,8 @@ const CFG: Record<OrbState, OrbConfig> = {
   partial: {
     color: '#F59E0B',
     glowColor: 'rgba(245,158,11,0.6)',
-    label: 'SOCKET ONLY',
-    sublabel: 'Awaiting data stream',
+    label: 'UPLINK PARTIAL',
+    sublabel: 'REST active · socket pending',
     r1Duration: 11, r2Duration: -15, r3Duration: 8, pulseDuration: 1.8,
   },
   offline: {
@@ -53,7 +53,7 @@ export function deriveState(
 ): OrbState {
   if (booting) return 'connecting';
   if (socketConnected && isUsingLiveBackendData) return 'live';
-  if (socketConnected) return 'partial';
+  if (socketConnected || isUsingLiveBackendData) return 'partial';
   return 'offline';
 }
 
