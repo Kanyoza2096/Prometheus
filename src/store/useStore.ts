@@ -4,6 +4,14 @@ import { supabase, isSupabaseConfigured, refreshSupabaseClient } from '../lib/su
 
 export type ServiceStatus = 'online' | 'degraded' | 'offline';
 
+export interface LiveNotification {
+  id: string;
+  type: 'alert' | 'post' | 'message' | 'payload';
+  title: string;
+  subtitle?: string;
+  severity?: string;
+}
+
 export interface SystemHealth {
   id: string;
   name: string;
@@ -94,6 +102,9 @@ interface AppState {
 
   payloads: PayloadLog[];
   addPayload: (payload: PayloadLog) => void;
+
+  lastNotification: LiveNotification | null;
+  dismissNotification: () => void;
 
   stats: {
     messagesToday: number;
@@ -305,7 +316,14 @@ export const useStore = create<AppState>((set, get) => ({
     { id: '2', severity: 'MEDIUM', title: 'MWK Converter Latency Spike', time: Date.now() - 7200000 },
   ],
   addAlert: (alert) => set(state => ({
-    guardianAlerts: [alert, ...state.guardianAlerts].slice(0, 50)
+    guardianAlerts: [alert, ...state.guardianAlerts].slice(0, 50),
+    lastNotification: {
+      id:       `n_${Date.now()}`,
+      type:     'alert',
+      title:    alert.title,
+      subtitle: alert.severity,
+      severity: alert.severity,
+    },
   })),
 
   recentPosts: [
@@ -314,7 +332,13 @@ export const useStore = create<AppState>((set, get) => ({
     { id: 'p3', title: 'New Command Center Launch', platform: 'facebook', time: Date.now() - 1000 * 60 * 60 * 5, engagement: 856, thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=150&q=80' }
   ],
   addPost: (post) => set(state => ({
-    recentPosts: [post, ...state.recentPosts].slice(0, 20)
+    recentPosts: [post, ...state.recentPosts].slice(0, 20),
+    lastNotification: {
+      id:       `n_${Date.now()}`,
+      type:     'post',
+      title:    post.title,
+      subtitle: post.platform,
+    },
   })),
 
   payloads: [
@@ -380,6 +404,9 @@ export const useStore = create<AppState>((set, get) => ({
   addPayload: (payload) => set(state => ({
     payloads: [payload, ...state.payloads].slice(0, 50)
   })),
+
+  lastNotification: null,
+  dismissNotification: () => set({ lastNotification: null }),
 
   stats: {
     messagesToday: 14052,

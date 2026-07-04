@@ -23,6 +23,7 @@ import {
 import { cn } from '../lib/utils';
 import CommandTerminal from './CommandTerminal';
 import CommandPalette from './CommandPalette';
+import LiveEventToast from './LiveEventToast';
 import { ConnectionOrb, ConnectionBadge } from './ConnectionOrb';
 import { supabase } from '../lib/supabase';
 
@@ -421,6 +422,7 @@ export default function Layout() {
 
       <CommandPalette />
       <CommandTerminal />
+      <LiveEventToast />
 
     </div>
   );
