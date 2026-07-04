@@ -43,10 +43,12 @@ export default function Workflows() {
 
   // Fetch real backend config for posting schedule
   const { data: statusData, isFetching, refetch } = useQuery({
-    queryKey: ['backend-status', restEndpoint],
-    queryFn:  () => fetchStatus(cfg),
+    queryKey:                   ['backend-status', restEndpoint],
+    queryFn:                    () => fetchStatus(cfg),
     retry: 1,
-    staleTime: 60_000,
+    staleTime:                  300_000,           // treat config as fresh for 5 min
+    refetchInterval:            300_000,           // re-fetch every 5 min at most
+    refetchIntervalInBackground: false,
   });
 
   const config = statusData?.config || backendConfig?.config;

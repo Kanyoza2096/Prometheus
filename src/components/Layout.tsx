@@ -88,7 +88,7 @@ export default function Layout() {
       }
     };
     measure();
-    const id = setInterval(measure, 3000);
+    const id = setInterval(measure, 30_000); // 30s is plenty for latency tracking
     return () => clearInterval(id);
   }, [socketConnected, restEndpoint, masterToken, pushLatency]);
 

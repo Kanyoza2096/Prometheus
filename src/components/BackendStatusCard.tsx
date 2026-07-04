@@ -16,7 +16,7 @@ interface PingResult {
 }
 
 const BACKEND_URL = 'https://kanyoza-systems-bot.onrender.com';
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_MS = 120_000; // 2 min — /status should not trigger AI calls but keep interval sane
 const WAKE_TIMEOUT_MS  = 70_000;
 const PING_TIMEOUT_MS  = 12_000;
 
@@ -72,12 +72,12 @@ export default function BackendStatusCard() {
     return status;
   }, []);
 
-  // Poll every 30 s
+  // Poll every 2 min, skip when tab is hidden
   useEffect(() => {
     runPing();
     const schedule = () => {
       pollTimer.current = setTimeout(async () => {
-        await runPing();
+        if (document.visibilityState === 'visible') await runPing();
         schedule();
       }, POLL_INTERVAL_MS);
     };
@@ -310,7 +310,7 @@ export default function BackendStatusCard() {
           animate={{ opacity: [0.3, 1, 0.3] }}
           transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
         />
-        <span className="text-[9px] font-mono text-brand-text-muted">Auto-checks every 30s</span>
+        <span className="text-[9px] font-mono text-brand-text-muted">Auto-checks every 2 min</span>
       </div>
     </div>
   );

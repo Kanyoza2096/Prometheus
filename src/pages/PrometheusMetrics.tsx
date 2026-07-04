@@ -62,9 +62,10 @@ export default function PrometheusMetrics() {
 
   // Poll /health/deep every 10 s for real service latency data
   const { data: healthData, isFetching, refetch } = useQuery({
-    queryKey:        ['health-deep', restEndpoint],
-    queryFn:         () => fetchHealth(cfg),
-    refetchInterval: 10_000,
+    queryKey:                   ['health-deep', restEndpoint],
+    queryFn:                    () => fetchHealth(cfg),
+    refetchInterval:            60_000, // reduced: health/deep should not be hit aggressively
+    refetchIntervalInBackground: false, // stop polling when tab is hidden
     retry: 1,
   });
 

@@ -598,8 +598,10 @@ export const useStore = create<AppState>((set, get) => ({
       .then(data => { if (data) set({ backendConfig: data }); })
       .catch(() => {});
 
-    // Poll stats + health every 30 s
+    // Poll stats + health every 2 min — pause when tab is hidden to avoid
+    // hammering backend endpoints that may trigger expensive AI calls.
     const timer = setInterval(async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const [sr, hr] = await Promise.allSettled([
           fetch(`${base}/dashboard/live`, { headers }),
@@ -631,7 +633,7 @@ export const useStore = create<AppState>((set, get) => ({
           }
         }
       } catch { /* ignore */ }
-    }, 30_000);
+    }, 120_000);
 
     set({ pollingTimer: timer });
 
