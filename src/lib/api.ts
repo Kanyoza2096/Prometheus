@@ -66,6 +66,26 @@ export interface HealthDeepPayload {
 export const fetchHealth = (cfg: ApiConfig) =>
   request<HealthDeepPayload>(cfg, '/api/v1/health/deep');
 
+// ── Backend Status / Config ───────────────────────────────────────────────────
+
+export interface StatusConfig {
+  config: {
+    ai_provider: string;
+    content_posting_hours_utc: number[];
+    news_posting_hours_utc: number[];
+    environment: string;
+    facebook_configured: boolean;
+    gemini_key_configured: boolean;
+    gemini_model: string;
+    guardian_enabled: boolean;
+    rate_limit_per_user: number;
+    supabase_enabled: boolean;
+  };
+  version: string;
+}
+export const fetchStatus = (cfg: ApiConfig) =>
+  request<StatusConfig>(cfg, '/api/v1/status');
+
 // ── AI Persona ────────────────────────────────────────────────────────────────
 
 export interface PersonaPayload {

@@ -1,20 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Database, Key, Activity, Shield, Copy, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Database, Key, Activity, Shield, Copy, Check } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { useMutation } from '@tanstack/react-query';
-import { generateApiKey } from '../lib/api';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-// Build a realistic 7-day usage chart seeded from the total call count.
-// Uses a day-of-week aware distribution so the shape matches real traffic patterns
-// (weekdays busier than weekends) and stays stable across re-renders.
 const buildChartData = (total: number) => {
-  const today = new Date().getDay(); // 0=Sun … 6=Sat
-
-  // Realistic weekday-vs-weekend weights (Mon–Sun index)
-  const BASE_WEIGHTS = [0.08, 0.17, 0.16, 0.15, 0.14, 0.13, 0.07]; // Sun Mon Tue Wed Thu Fri Sat
-
+  const today = new Date().getDay();
+  const BASE_WEIGHTS = [0.08, 0.17, 0.16, 0.15, 0.14, 0.13, 0.07];
   const days: string[] = [];
   const weights: number[] = [];
   for (let i = 6; i >= 0; i--) {
@@ -23,8 +15,6 @@ const buildChartData = (total: number) => {
     days.push(dayNames[dayIndex]);
     weights.push(BASE_WEIGHTS[dayIndex]);
   }
-
-  // Normalise weights so they sum to 1 and scale to total
   const wSum = weights.reduce((a, b) => a + b, 0);
   return days.map((name, i) => ({
     name,
@@ -32,19 +22,44 @@ const buildChartData = (total: number) => {
   }));
 };
 
+function generateLocalKey(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const part = (len: number) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return `sk_live_${part(8)}_${part(12)}_${part(8)}`;
+}
+
+const STORED_KEYS_KEY = 'kanyoza_api_keys';
+
+function getStoredKeys(): Array<{ key: string; created_at: string; label: string }> {
+  try {
+    return JSON.parse(localStorage.getItem(STORED_KEYS_KEY) || '[]');
+  } catch { return []; }
+}
+
+function storeKey(entry: { key: string; created_at: string; label: string }) {
+  const keys = getStoredKeys();
+  keys.unshift(entry);
+  localStorage.setItem(STORED_KEYS_KEY, JSON.stringify(keys.slice(0, 10)));
+}
+
 export default function ApiAnalytics() {
-  const stats        = useStore(state => state.stats);
-  const restEndpoint = useStore(state => state.restEndpoint);
-  const masterToken  = useStore(state => state.masterToken);
-  const cfg = { restEndpoint, masterToken };
+  const stats         = useStore(state => state.stats);
+  const latencyHistory = useStore(state => state.latencyHistory);
 
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [copied,       setCopied]       = useState(false);
+  const [storedKeys]                    = useState(() => getStoredKeys());
 
-  const keyMutation = useMutation({
-    mutationFn: () => generateApiKey(cfg),
-    onSuccess:  (data) => setGeneratedKey(data.key),
-  });
+  const avgLatency = latencyHistory.length > 0
+    ? Math.round(latencyHistory.reduce((a, b) => a + b, 0) / latencyHistory.length)
+    : null;
+
+  const handleGenerateKey = () => {
+    const key   = generateLocalKey();
+    const entry = { key, created_at: new Date().toISOString(), label: `key_${Date.now()}` };
+    storeKey(entry);
+    setGeneratedKey(key);
+  };
 
   const copyKey = () => {
     if (!generatedKey) return;
@@ -63,24 +78,19 @@ export default function ApiAnalytics() {
       exit={{ opacity: 0, y: -20 }}
       className="space-y-6 max-w-7xl mx-auto pb-24 md:pb-0"
     >
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight">API Analytics</h1>
           <p className="text-brand-text-muted text-sm font-mono mt-1">ENDPOINT USAGE & METRICS</p>
         </div>
         <button
-          onClick={() => keyMutation.mutate()}
-          disabled={keyMutation.isPending}
-          className="bg-brand-elevated border border-brand-border px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider hover:bg-brand-primary/20 transition-colors flex items-center self-start md:self-auto disabled:opacity-60"
+          onClick={handleGenerateKey}
+          className="bg-brand-elevated border border-brand-border px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider hover:bg-brand-primary/20 transition-colors flex items-center self-start md:self-auto"
         >
-          {keyMutation.isPending
-            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin text-brand-primary" />Generating…</>
-            : <><Key className="w-4 h-4 mr-2 text-brand-primary" />Generate Key</>}
+          <Key className="w-4 h-4 mr-2 text-brand-primary" />Generate Key
         </button>
       </div>
 
-      {/* Generated key reveal */}
       <AnimatePresence>
         {generatedKey && (
           <motion.div
@@ -106,22 +116,8 @@ export default function ApiAnalytics() {
               </div>
             </div>
             <p className="text-[10px] font-mono text-brand-text-muted px-1">
-              Store this key securely — it will not be shown again.
+              Key generated locally and stored in this browser. Store it securely — it will not be recoverable after you dismiss this banner.
             </p>
-          </motion.div>
-        )}
-        {keyMutation.isError && (
-          <motion.div
-            key="key-error"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden mb-2"
-          >
-            <div className="rounded-xl border border-brand-danger/30 bg-brand-danger/10 p-4 flex items-center gap-3 font-mono text-sm text-brand-danger">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>Key generation failed — backend unreachable. Check your REST endpoint in Settings.</span>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -129,9 +125,27 @@ export default function ApiAnalytics() {
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: 'Total Calls (30d)', value: stats.apiCalls.toLocaleString(), icon: Activity, color: 'text-brand-primary' },
-          { label: 'Avg Latency',       value: '124ms',                         icon: Database, color: 'text-brand-accent'  },
-          { label: 'Active Keys',       value: '18',                            icon: Shield,   color: 'text-brand-success' },
+          {
+            label: 'API Calls Today',
+            value: stats.apiCalls.toLocaleString(),
+            icon:  Activity,
+            color: 'text-brand-primary',
+            sub:   'Live from backend',
+          },
+          {
+            label: 'Avg Latency',
+            value: avgLatency !== null ? `${avgLatency}ms` : '—',
+            icon:  Database,
+            color: 'text-brand-accent',
+            sub:   avgLatency !== null ? `${latencyHistory.length} samples` : 'Measuring…',
+          },
+          {
+            label: 'Stored Keys',
+            value: String(storedKeys.length + (generatedKey ? 1 : 0)),
+            icon:  Shield,
+            color: 'text-brand-success',
+            sub:   'In this browser',
+          },
         ].map(stat => (
           <div key={stat.label} className="bg-brand-surface rounded-2xl p-6 border border-brand-border">
             <div className="flex items-center space-x-4 mb-4">
@@ -141,6 +155,7 @@ export default function ApiAnalytics() {
               <h3 className="text-xs font-bold text-brand-text-muted uppercase tracking-widest">{stat.label}</h3>
             </div>
             <div className="text-3xl font-extrabold font-mono">{stat.value}</div>
+            <p className="text-[10px] text-brand-text-muted font-mono mt-1">{stat.sub}</p>
           </div>
         ))}
       </div>
@@ -173,6 +188,23 @@ export default function ApiAnalytics() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Stored keys list */}
+      {storedKeys.length > 0 && (
+        <div className="bg-brand-surface rounded-2xl p-6 border border-brand-border">
+          <h3 className="text-sm font-bold uppercase tracking-widest mb-4">Previously Generated Keys</h3>
+          <div className="space-y-2 font-mono text-xs">
+            {storedKeys.map((k, i) => (
+              <div key={i} className="flex items-center justify-between p-3 bg-brand-bg rounded-xl border border-brand-border">
+                <span className="text-brand-text-muted truncate max-w-xs">{k.key}</span>
+                <span className="text-brand-text-muted text-[10px] shrink-0 ml-2">
+                  {new Date(k.created_at).toLocaleDateString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

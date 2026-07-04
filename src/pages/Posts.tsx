@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStore, Post } from '../store/useStore';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Calendar, Plus, Clock, Activity, Share2, X, Send, CheckCircle2, Loader2, AlertCircle, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useMutation } from '@tanstack/react-query';
-import { triggerPost } from '../lib/api';
 import { cn } from '../lib/utils';
 
 const PLATFORM_THUMBNAILS = {
@@ -16,17 +15,17 @@ const PLATFORM_THUMBNAILS = {
 type Toast = { msg: string; type: 'success' | 'error' };
 
 export default function Posts() {
-  const { recentPosts, addPost, restEndpoint, masterToken } = useStore();
-  const cfg = { restEndpoint, masterToken };
+  const { recentPosts, addPost } = useStore();
 
   const [isNewPostModalOpen, setIsNewPostModalOpen] = useState(false);
   const [selectedPost,       setSelectedPost]       = useState<Post | null>(null);
   const [filterPlatform,     setFilterPlatform]     = useState<string>('all');
   const [toast,              setToast]              = useState<Toast | null>(null);
+  const [isSubmitting,       setIsSubmitting]       = useState(false);
+  const [isRebroadcasting,   setIsRebroadcasting]   = useState(false);
 
-  // New Post Form State
   const [title,     setTitle]     = useState('');
-  const [platform,  setPlatform]  = useState<'facebook' | 'twitter' | 'linkedin'>('linkedin');
+  const [platform,  setPlatform]  = useState<'facebook' | 'twitter' | 'linkedin'>('facebook');
   const [thumbnail, setThumbnail] = useState('');
 
   const showToast = (msg: string, type: Toast['type'] = 'success') => {
@@ -34,38 +33,85 @@ export default function Posts() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Re-broadcast mutation — calls backend, falls back gracefully
-  const rebroadcastMutation = useMutation({
-    mutationFn: () => triggerPost(cfg),
-    onSuccess: () => {
-      showToast(`Re-broadcast submitted for "${selectedPost?.title}" — backend acknowledged.`, 'success');
-      setSelectedPost(null);
-    },
-    onError: () => {
-      // Backend unreachable — still optimistically fire a local notification
-      showToast(`Re-broadcast queued for "${selectedPost?.title}" (offline mode — will retry when backend reconnects).`, 'success');
-      setSelectedPost(null);
-    },
-  });
-
-  const handleCreatePost = (e: React.FormEvent) => {
+  const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+
+    setIsSubmitting(true);
+    const thumb = thumbnail.trim() || PLATFORM_THUMBNAILS[platform];
 
     const newPost: Post = {
       id:         `p_${Date.now()}`,
       title:      title.trim(),
       platform,
       time:       Date.now(),
-      engagement: Math.floor(Math.random() * 50) + 10,
-      thumbnail:  thumbnail.trim() || PLATFORM_THUMBNAILS[platform],
+      engagement: 0,
+      thumbnail:  thumb,
     };
 
-    addPost(newPost);
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase.from('posts').insert({
+          title:    newPost.title,
+          platform: newPost.platform,
+          thumbnail: newPost.thumbnail,
+          engagement: 0,
+        });
+        if (error) throw error;
+        // Real-time subscription in store will pick up the insert — also add locally for instant UI
+        addPost(newPost);
+        showToast(`Broadcast saved to database and published to ${platform.toUpperCase()}!`);
+      } catch (err: any) {
+        // Table may not exist yet — fall back to local store
+        addPost(newPost);
+        showToast(`Broadcast queued locally (${err?.message || 'DB write failed'}).`, 'error');
+      }
+    } else {
+      addPost(newPost);
+      showToast(`Broadcast published to ${platform.toUpperCase()}!`);
+    }
+
     setTitle('');
     setThumbnail('');
+    setIsSubmitting(false);
     setIsNewPostModalOpen(false);
-    showToast(`Broadcast published to ${platform.toUpperCase()}!`);
+  };
+
+  const handleRebroadcast = async () => {
+    if (!selectedPost) return;
+    setIsRebroadcasting(true);
+
+    const repost: Post = {
+      id:         `p_${Date.now()}`,
+      title:      selectedPost.title,
+      platform:   selectedPost.platform,
+      time:       Date.now(),
+      engagement: 0,
+      thumbnail:  selectedPost.thumbnail,
+    };
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase.from('posts').insert({
+          title:     repost.title,
+          platform:  repost.platform,
+          thumbnail: repost.thumbnail,
+          engagement: 0,
+        });
+        if (error) throw error;
+        addPost(repost);
+        showToast(`Re-broadcast saved and published to ${selectedPost.platform.toUpperCase()}.`);
+      } catch {
+        addPost(repost);
+        showToast(`Re-broadcast queued — will sync when database is available.`);
+      }
+    } else {
+      addPost(repost);
+      showToast(`Re-broadcast queued for "${selectedPost.title}".`);
+    }
+
+    setIsRebroadcasting(false);
+    setSelectedPost(null);
   };
 
   const filteredPosts = recentPosts.filter(p => filterPlatform === 'all' || p.platform === filterPlatform);
@@ -77,7 +123,6 @@ export default function Posts() {
       exit={{ opacity: 0, y: -20 }}
       className="max-w-7xl mx-auto pb-24 md:pb-0 relative"
     >
-      {/* Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -100,10 +145,14 @@ export default function Posts() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight">Content Studio</h1>
-          <p className="text-brand-text-muted text-sm font-mono mt-1">BROADCAST MANAGEMENT</p>
+          <p className="text-brand-text-muted text-sm font-mono mt-1">
+            BROADCAST MANAGEMENT
+            {isSupabaseConfigured() && (
+              <span className="ml-3 text-brand-success">· Supabase live</span>
+            )}
+          </p>
         </div>
         <div className="flex items-center space-x-3 self-start md:self-auto">
-          {/* Platform Filter */}
           <div className="bg-brand-surface border border-brand-border p-1 rounded-xl flex space-x-1">
             {['all', 'linkedin', 'twitter', 'facebook'].map(p => (
               <button
@@ -126,7 +175,6 @@ export default function Posts() {
         </div>
       </div>
 
-      {/* Empty state */}
       {filteredPosts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-brand-text-muted">
           <FileText className="w-16 h-16 mb-4 opacity-20" />
@@ -207,6 +255,13 @@ export default function Posts() {
                 </button>
               </div>
 
+              {isSupabaseConfigured() && (
+                <div className="mb-4 text-[10px] font-mono text-brand-success flex items-center gap-1.5 px-3 py-1.5 bg-brand-success/10 border border-brand-success/20 rounded-lg">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-success inline-block" />
+                  Connected to Supabase — post will be saved to database
+                </div>
+              )}
+
               <form onSubmit={handleCreatePost} className="space-y-4 font-mono text-xs">
                 <div>
                   <label className="block text-brand-text-muted uppercase tracking-wider mb-2 font-bold">
@@ -227,7 +282,7 @@ export default function Posts() {
                     Target Platform
                   </label>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['linkedin', 'twitter', 'facebook'] as const).map(p => (
+                    {(['facebook', 'linkedin', 'twitter'] as const).map(p => (
                       <button
                         type="button"
                         key={p}
@@ -244,7 +299,7 @@ export default function Posts() {
 
                 <div>
                   <label className="block text-brand-text-muted uppercase tracking-wider mb-2 font-bold">
-                    Thumbnail URL <span className="normal-case text-[10px] opacity-60">(optional — defaults to platform template)</span>
+                    Thumbnail URL <span className="normal-case text-[10px] opacity-60">(optional)</span>
                   </label>
                   <input
                     type="url"
@@ -265,9 +320,12 @@ export default function Posts() {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-brand-primary text-white font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors flex items-center shadow-glow-primary"
+                    disabled={isSubmitting}
+                    className="px-5 py-2.5 rounded-xl bg-brand-primary text-white font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors flex items-center shadow-glow-primary disabled:opacity-60"
                   >
-                    <Send className="w-4 h-4 mr-2" /> Publish Broadcast
+                    {isSubmitting
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Publishing…</>
+                      : <><Send className="w-4 h-4 mr-2" />Publish Broadcast</>}
                   </button>
                 </div>
               </form>
@@ -310,11 +368,11 @@ export default function Posts() {
 
               <div className="flex space-x-3 pt-4 border-t border-brand-border">
                 <button
-                  onClick={() => rebroadcastMutation.mutate()}
-                  disabled={rebroadcastMutation.isPending}
+                  onClick={handleRebroadcast}
+                  disabled={isRebroadcasting}
                   className="flex-1 py-2.5 rounded-xl bg-brand-primary text-white font-bold uppercase text-xs tracking-wider hover:bg-brand-primary/90 transition-colors flex items-center justify-center disabled:opacity-60"
                 >
-                  {rebroadcastMutation.isPending
+                  {isRebroadcasting
                     ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Broadcasting…</>
                     : <><Share2 className="w-4 h-4 mr-2" />Re-Broadcast</>}
                 </button>

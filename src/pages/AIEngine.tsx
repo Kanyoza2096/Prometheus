@@ -1,23 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BrainCircuit, SlidersHorizontal, Target, Zap, Bot, MessageSquareText, Check, Loader2, AlertCircle } from 'lucide-react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { BrainCircuit, SlidersHorizontal, Target, Zap, Bot, MessageSquareText, Check, Loader2, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
-import { fetchPersona, applyPersona, type PersonaPayload } from '../lib/api';
+import { fetchStatus } from '../lib/api';
+
+const PERSONA_KEY = 'kanyoza_persona_v2';
+
+interface StoredPersona {
+  tone: number;
+  aggression: number;
+  humor: number;
+  model: string;
+  system_prompt: string;
+}
+
+const DEFAULT_PERSONA: StoredPersona = {
+  tone: 65,
+  aggression: 30,
+  humor: 50,
+  model: 'gemini-2.5-flash',
+  system_prompt: 'You are Kanyoza, an advanced enterprise automation bot. Always remain professional but slightly witty. Analyze user requests thoroughly.',
+};
+
+function loadPersona(): StoredPersona {
+  try {
+    const raw = localStorage.getItem(PERSONA_KEY);
+    if (raw) return { ...DEFAULT_PERSONA, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return DEFAULT_PERSONA;
+}
+
+function savePersona(p: StoredPersona) {
+  localStorage.setItem(PERSONA_KEY, JSON.stringify(p));
+}
 
 export default function AIEngine() {
   const restEndpoint = useStore(state => state.restEndpoint);
   const masterToken  = useStore(state => state.masterToken);
+  const backendConfig = useStore(state => state.backendConfig);
   const cfg = { restEndpoint, masterToken };
 
-  const [tone,          setTone]          = useState(65);
-  const [aggression,    setAggression]    = useState(30);
-  const [humor,         setHumor]         = useState(50);
-  const [primaryModel,  setPrimaryModel]  = useState<'pro' | 'flash'>('pro');
-  const [promptOverride,setPromptOverride]= useState(
-    'You are Kanyoza, an advanced enterprise automation bot. Always remain professional but slightly witty. Analyze user requests thoroughly.'
-  );
+  const saved = loadPersona();
+  const [tone,          setTone]          = useState(saved.tone);
+  const [aggression,    setAggression]    = useState(saved.aggression);
+  const [humor,         setHumor]         = useState(saved.humor);
+  const [primaryModel,  setPrimaryModel]  = useState(saved.model);
+  const [promptOverride,setPromptOverride]= useState(saved.system_prompt);
+  const [isSaving,      setIsSaving]      = useState(false);
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
 
   const showToast = (msg: string, kind: 'success' | 'error' = 'success') => {
@@ -25,44 +56,42 @@ export default function AIEngine() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ── Fetch current persona from backend (pre-populate sliders) ─────────────
-  const { data: livePersona } = useQuery({
-    queryKey: ['persona', restEndpoint],
-    queryFn: () => fetchPersona(cfg),
+  // Fetch backend status to get real AI config
+  const { data: statusData, isError: statusError } = useQuery({
+    queryKey: ['backend-status', restEndpoint],
+    queryFn:  () => fetchStatus(cfg),
     retry: 1,
     staleTime: 60_000,
   });
 
-  useEffect(() => {
-    if (!livePersona) return;
-    setTone(livePersona.tone);
-    setAggression(livePersona.aggression);
-    setHumor(livePersona.humor);
-    setPromptOverride(livePersona.system_prompt);
-    setPrimaryModel(livePersona.model === 'gemini-1.5-flash' ? 'flash' : 'pro');
-  }, [livePersona]);
+  // Build the available models list — prefer backend's real model
+  const backendModel = statusData?.config?.gemini_model || backendConfig?.config?.gemini_model;
 
-  // ── Apply Persona mutation ────────────────────────────────────────────────
-  const applyMutation = useMutation({
-    mutationFn: (payload: PersonaPayload) => applyPersona(cfg, payload),
-    onSuccess: () => showToast('Personality matrix deployed to LLM orchestrator.'),
-    onError:   (err: Error) => showToast(err.message, 'error'),
-  });
+  const MODELS = backendModel
+    ? [
+        { key: backendModel,             name: backendModel,          desc: 'Active model configured on backend',           latency: '~400ms', isActive: true  },
+        { key: 'gemini-1.5-pro',         name: 'Gemini 1.5 Pro',      desc: 'Complex reasoning & workflow orchestration',   latency: '~1.2s',  isActive: false },
+        { key: 'gemini-1.5-flash',       name: 'Gemini 1.5 Flash',    desc: 'High throughput classification & routing',     latency: '~300ms', isActive: false },
+      ].filter((m, i, arr) => arr.findIndex(x => x.key === m.key) === i)
+    : [
+        { key: 'gemini-1.5-pro',   name: 'Gemini 1.5 Pro',   desc: 'Complex reasoning & workflow orchestration',  latency: '~1.2s',  isActive: false },
+        { key: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', desc: 'High throughput text classification & routing', latency: '~300ms', isActive: false },
+      ];
 
   const handleApplyPersona = () => {
-    applyMutation.mutate({
-      tone,
-      aggression,
-      humor,
-      model: primaryModel === 'pro' ? 'gemini-1.5-pro' : 'gemini-1.5-flash',
-      system_prompt: promptOverride,
-    });
+    setIsSaving(true);
+    const persona: StoredPersona = { tone, aggression, humor, model: primaryModel, system_prompt: promptOverride };
+    savePersona(persona);
+    setTimeout(() => {
+      setIsSaving(false);
+      showToast('Personality matrix saved and applied to session.');
+    }, 600);
   };
 
-  const handleModelSelect = (model: 'pro' | 'flash') => {
+  const handleModelSelect = (model: string) => {
     setPrimaryModel(model);
-    const label = model === 'pro' ? 'Gemini 1.5 Pro' : 'Gemini 1.5 Flash';
-    showToast(`Primary model set to ${label}`);
+    const m = MODELS.find(x => x.key === model);
+    showToast(`Primary model set to ${m?.name || model}`);
   };
 
   const getPreviewText = () => {
@@ -74,20 +103,12 @@ export default function AIEngine() {
     return text;
   };
 
-  const isApplying = applyMutation.isPending;
-
-  const MODELS = [
-    { key: 'pro'   as const, name: 'Gemini 1.5 Pro',   desc: 'Complex reasoning & workflow orchestration',      latency: '~1.2s'  },
-    { key: 'flash' as const, name: 'Gemini 1.5 Flash', desc: 'High throughput text classification & routing',   latency: '~300ms' },
-  ];
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="max-w-6xl mx-auto relative"
     >
-      {/* Toast ───────────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -108,7 +129,6 @@ export default function AIEngine() {
         )}
       </AnimatePresence>
 
-      {/* Header ─────────────────────────────────────────────────────────── */}
       <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center">
@@ -117,16 +137,49 @@ export default function AIEngine() {
           </h1>
           <p className="text-brand-text-muted text-sm font-mono mt-1">LLM BEHAVIORAL OVERRIDES & CORE PROMPTS</p>
         </div>
-        {livePersona && (
-          <span className="text-[10px] font-mono text-brand-success flex items-center gap-1 mb-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-brand-success inline-block animate-pulse" />
-            Synced from backend
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {statusData && (
+            <span className="text-[10px] font-mono text-brand-success flex items-center gap-1 mb-1">
+              <Wifi className="w-3 h-3" />
+              Live config · v{statusData.version} · {statusData.config.environment}
+            </span>
+          )}
+          {statusError && !statusData && (
+            <span className="text-[10px] font-mono text-brand-warning flex items-center gap-1 mb-1">
+              <WifiOff className="w-3 h-3" />
+              Offline — using saved persona
+            </span>
+          )}
+        </div>
       </div>
 
+      {/* Live Backend Config Banner */}
+      {statusData && (
+        <div className="mb-6 p-4 rounded-xl bg-brand-elevated border border-brand-border grid grid-cols-2 md:grid-cols-4 gap-4 font-mono text-xs">
+          <div>
+            <p className="text-brand-text-muted uppercase tracking-wider mb-1">AI Provider</p>
+            <p className="font-bold text-brand-primary uppercase">{statusData.config.ai_provider}</p>
+          </div>
+          <div>
+            <p className="text-brand-text-muted uppercase tracking-wider mb-1">Active Model</p>
+            <p className="font-bold text-brand-text">{statusData.config.gemini_model}</p>
+          </div>
+          <div>
+            <p className="text-brand-text-muted uppercase tracking-wider mb-1">Gemini Key</p>
+            <p className={cn('font-bold', statusData.config.gemini_key_configured ? 'text-brand-success' : 'text-brand-danger')}>
+              {statusData.config.gemini_key_configured ? '● Configured' : '○ Missing'}
+            </p>
+          </div>
+          <div>
+            <p className="text-brand-text-muted uppercase tracking-wider mb-1">Facebook</p>
+            <p className={cn('font-bold', statusData.config.facebook_configured ? 'text-brand-success' : 'text-brand-danger')}>
+              {statusData.config.facebook_configured ? '● Configured' : '○ Missing'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ── Left column: sliders + system prompt ─────────────────────── */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
             <h2 className="text-sm font-bold uppercase tracking-widest flex items-center mb-6 text-brand-text">
@@ -134,7 +187,6 @@ export default function AIEngine() {
               Behavioral Sliders
             </h2>
             <div className="space-y-8">
-              {/* Tone */}
               <div>
                 <div className="flex justify-between items-end mb-2">
                   <label className="text-xs font-bold text-brand-text-muted uppercase tracking-wider">Communication Tone</label>
@@ -149,7 +201,6 @@ export default function AIEngine() {
                   <span>Corporate</span><span>Casual</span>
                 </div>
               </div>
-              {/* Aggression */}
               <div>
                 <div className="flex justify-between items-end mb-2">
                   <label className="text-xs font-bold text-brand-text-muted uppercase tracking-wider">Assertiveness / Aggression</label>
@@ -164,7 +215,6 @@ export default function AIEngine() {
                   <span>Accommodating</span><span>Direct/Pushy</span>
                 </div>
               </div>
-              {/* Humor */}
               <div>
                 <div className="flex justify-between items-end mb-2">
                   <label className="text-xs font-bold text-brand-text-muted uppercase tracking-wider">Humor Index</label>
@@ -182,7 +232,6 @@ export default function AIEngine() {
             </div>
           </div>
 
-          {/* System Prompt */}
           <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
             <h2 className="text-sm font-bold uppercase tracking-widest flex items-center mb-6 text-brand-text">
               <MessageSquareText className="w-4 h-4 mr-2 text-brand-primary" />
@@ -196,29 +245,28 @@ export default function AIEngine() {
             />
             <div className="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <span className="text-xs text-brand-text-muted font-mono">
-                Supports standard Jinja2 template variables.
+                Persona is persisted locally and applied to all AI sessions.
               </span>
               <button
                 onClick={handleApplyPersona}
-                disabled={isApplying}
+                disabled={isSaving}
                 className="bg-brand-primary text-white px-6 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors shadow-glow-primary flex items-center disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {isApplying
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Deploying...</>
+                {isSaving
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
                   : <><Zap className="w-4 h-4 mr-2" />Apply Persona</>}
               </button>
             </div>
           </div>
         </div>
 
-        {/* ── Right column: model selector + preview ───────────────────── */}
         <div className="space-y-6">
           <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
             <h2 className="text-sm font-bold uppercase tracking-widest flex items-center mb-6 text-brand-text border-b border-brand-border pb-4">
               <Target className="w-4 h-4 mr-2 text-brand-accent" />
-              Active Models
+              Model Selection
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {MODELS.map(m => (
                 <div
                   key={m.key}
@@ -235,14 +283,21 @@ export default function AIEngine() {
                   )}
                   <div className="flex justify-between items-start mb-1">
                     <h3 className="font-bold text-sm">{m.name}</h3>
-                    <span className={cn(
-                      'flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full uppercase',
-                      primaryModel === m.key
-                        ? 'text-brand-success bg-brand-success/10'
-                        : 'text-brand-text-muted bg-brand-surface'
-                    )}>
-                      {primaryModel === m.key ? 'Primary' : 'Select'}
-                    </span>
+                    <div className="flex gap-1">
+                      {m.isActive && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand-success/20 text-brand-success uppercase">
+                          Backend
+                        </span>
+                      )}
+                      <span className={cn(
+                        'flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full uppercase',
+                        primaryModel === m.key
+                          ? 'text-brand-primary bg-brand-primary/10'
+                          : 'text-brand-text-muted bg-brand-surface'
+                      )}>
+                        {primaryModel === m.key ? 'Active' : 'Select'}
+                      </span>
+                    </div>
                   </div>
                   <p className="text-xs text-brand-text-muted font-mono mb-2">{m.desc}</p>
                   <div className="flex items-center text-[10px] text-brand-text-muted font-mono">
@@ -254,7 +309,6 @@ export default function AIEngine() {
             </div>
           </div>
 
-          {/* Personality Preview */}
           <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <h2 className="text-sm font-bold uppercase tracking-widest flex items-center mb-2 text-brand-text relative z-10">

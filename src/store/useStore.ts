@@ -117,6 +117,12 @@ interface AppState {
   pushLatency: (ms: number) => void;
 
   fetchInitialData: () => Promise<void>;
+
+  backendConfig: Record<string, any> | null;
+  realtimeChannel: any;
+  pollingTimer: ReturnType<typeof setInterval> | null;
+  startRealtimeSubscriptions: () => void;
+  stopRealtimeSubscriptions: () => void;
 }
 
 const INITIAL_HEALTH: SystemHealth[] = [
@@ -133,6 +139,7 @@ export const useStore = create<AppState>((set, get) => ({
   login: () => set({ isAuthenticated: true }),
   logout: () => {
     get().disconnectSocket();
+    get().stopRealtimeSubscriptions();
     set({ isAuthenticated: false });
   },
 
@@ -536,6 +543,124 @@ export const useStore = create<AppState>((set, get) => ({
     }
 
     set({ isUsingLiveBackendData: loadedLive });
+  },
+
+  backendConfig: null,
+  realtimeChannel: null,
+  pollingTimer: null,
+
+  startRealtimeSubscriptions: () => {
+    get().stopRealtimeSubscriptions();
+
+    const { restEndpoint, masterToken } = get();
+    const base = restEndpoint.replace(/\/+$/, '');
+    const headers: Record<string, string> = masterToken
+      ? { Authorization: `Bearer ${masterToken}` }
+      : {};
+
+    // Fetch backend config immediately on startup
+    fetch(`${base}/api/v1/status`, { headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) set({ backendConfig: data }); })
+      .catch(() => {});
+
+    // Poll stats + health every 30 s
+    const timer = setInterval(async () => {
+      try {
+        const [sr, hr] = await Promise.allSettled([
+          fetch(`${base}/api/v1/dashboard/live`, { headers }),
+          fetch(`${base}/api/v1/health/deep`,    { headers }),
+        ]);
+        if (sr.status === 'fulfilled' && sr.value.ok) {
+          const d = await sr.value.json();
+          get().updateStats({
+            messagesToday:  d.messages_today  ?? get().stats.messagesToday,
+            postsPublished: d.posts_published ?? get().stats.postsPublished,
+            activeUsers:    d.active_users    ?? get().stats.activeUsers,
+            apiCalls:       d.api_calls_today ?? get().stats.apiCalls,
+            guardianIssues: d.guardian_issues ?? get().stats.guardianIssues,
+          });
+          set({ isUsingLiveBackendData: true });
+        }
+        if (hr.status === 'fulfilled' && hr.value.ok) {
+          const hd = await hr.value.json();
+          if (hd?.services && typeof hd.services === 'object') {
+            const matrix: SystemHealth[] = Object.entries(hd.services).map(([name, svc]: [string, any]) => ({
+              id:          name,
+              name:        svc.page_name || name.charAt(0).toUpperCase() + name.slice(1),
+              status:      svc.status === 'ok' ? 'online' : svc.status === 'degraded' ? 'degraded' : 'offline',
+              latency:     svc.latency_ms ?? 0,
+              lastChecked: Date.now(),
+              uptime:      svc.status === 'ok' ? 99.9 : svc.status === 'degraded' ? 85.0 : 0,
+            }));
+            set({ healthMatrix: matrix });
+          }
+        }
+      } catch { /* ignore */ }
+    }, 30_000);
+
+    set({ pollingTimer: timer });
+
+    // Supabase real-time subscriptions (if Supabase is configured)
+    if (!isSupabaseConfigured()) return;
+
+    const channel = supabase
+      .channel('kanyoza-live-v2')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, ({ new: row }: any) => {
+        if (!get().isStreamPaused) {
+          get().addMessage({
+            id:        String(row.id    || `msg_${Date.now()}`),
+            user:      row.sender_id   || row.user     || 'Facebook User',
+            avatar:    row.avatar      || `https://ui-avatars.com/api/?name=${encodeURIComponent(row.sender_id || 'User')}&background=4F46E5&color=fff`,
+            message:   row.content     || row.text     || row.message || '',
+            time:      new Date(row.created_at || Date.now()).getTime(),
+            sentiment: row.sentiment   || 'neutral',
+          });
+        }
+        set(s => ({ stats: { ...s.stats, messagesToday: s.stats.messagesToday + 1 } }));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, ({ new: row }: any) => {
+        get().addPost({
+          id:         String(row.id         || `p_${Date.now()}`),
+          title:      row.title      || row.content || 'New Post',
+          platform:   row.platform   || 'facebook',
+          time:       new Date(row.created_at || Date.now()).getTime(),
+          engagement: row.engagement || 0,
+          thumbnail:  row.thumbnail  || 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=150&q=80',
+        });
+        set(s => ({ stats: { ...s.stats, postsPublished: s.stats.postsPublished + 1 } }));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts' }, ({ new: row }: any) => {
+        get().addAlert({
+          id:       String(row.id       || `a_${Date.now()}`),
+          severity: row.severity || 'MEDIUM',
+          title:    row.title    || row.message || 'Security Alert',
+          time:     new Date(row.created_at || Date.now()).getTime(),
+        });
+        set(s => ({ stats: { ...s.stats, guardianIssues: s.stats.guardianIssues + 1 } }));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payloads' }, ({ new: row }: any) => {
+        get().addPayload({
+          id:       String(row.id       || `req_${Date.now()}`),
+          time:     new Date(row.created_at || Date.now()).toLocaleTimeString(),
+          method:   row.method   || 'POST',
+          endpoint: row.endpoint || '/api/v1/webhook',
+          status:   row.status   || 200,
+          latency:  row.latency  || '100ms',
+          type:     row.type     || 'inbound',
+          request:  row.request  || {},
+          response: row.response || {},
+        });
+      })
+      .subscribe();
+
+    set({ realtimeChannel: channel });
+  },
+
+  stopRealtimeSubscriptions: () => {
+    const { realtimeChannel, pollingTimer } = get();
+    if (pollingTimer) { clearInterval(pollingTimer); set({ pollingTimer: null }); }
+    if (realtimeChannel) { supabase.removeChannel(realtimeChannel); set({ realtimeChannel: null }); }
   },
 
 }));

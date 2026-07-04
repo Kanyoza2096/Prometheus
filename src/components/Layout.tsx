@@ -31,6 +31,7 @@ export default function Layout() {
     logout, socketConnected, connectSocket, disconnectSocket,
     guardianAlerts, toggleTerminal, setPendingCommand, fetchInitialData, isUsingLiveBackendData,
     personaMood, restEndpoint, masterToken, latencyHistory, pushLatency,
+    startRealtimeSubscriptions, stopRealtimeSubscriptions,
   } = useStore();
 
   const MOOD_META: Record<string, { emoji: string; color: string }> = {
@@ -60,15 +61,19 @@ export default function Layout() {
   useEffect(() => {
     connectSocket();
     fetchInitialData();
-    return () => disconnectSocket();
-  }, [connectSocket, disconnectSocket, fetchInitialData]);
+    startRealtimeSubscriptions();
+    return () => {
+      disconnectSocket();
+      stopRealtimeSubscriptions();
+    };
+  }, [connectSocket, disconnectSocket, fetchInitialData, startRealtimeSubscriptions, stopRealtimeSubscriptions]);
 
   // Periodic RTT measurement — ping the REST /health endpoint every 3 s
   useEffect(() => {
     if (!socketConnected) return;
     const measure = async () => {
       const url = restEndpoint
-        ? `${restEndpoint.replace(/\/$/, '')}/health`
+        ? `${restEndpoint.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')}/api/v1/status`
         : null;
       if (!url) return;
       const t0 = performance.now();

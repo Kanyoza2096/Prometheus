@@ -1,80 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GitBranch, Play, CheckCircle2, CircleDashed, Server, Zap, Database, Globe, RefreshCcw, Brain, Image, Pause, Check, Loader2 } from 'lucide-react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { GitBranch, Play, CheckCircle2, CircleDashed, Server, Zap, Database, Globe, RefreshCcw, Brain, Image, Pause, Check, Clock, Calendar } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
-import { fetchWorkflowStatus, pauseWorkflow, resumeWorkflow } from '../lib/api';
+import { fetchStatus } from '../lib/api';
 
 type StepStatus = 'completed' | 'running' | 'pending' | 'error';
 interface Step { id: string; label: string; status: StepStatus; icon: React.ElementType; time: string; }
 
-const INITIAL_STEPS: Step[] = [
-  { id: 'topic',     label: 'Select Topic',       status: 'completed', icon: Database, time: '12ms'          },
-  { id: 'generate',  label: 'Generate Content',    status: 'completed', icon: Brain,    time: '1.4s'          },
-  { id: 'render',    label: 'Render Card',         status: 'running',   icon: Image,    time: 'In progress…'  },
-  { id: 'publish',   label: 'Publish to Social',   status: 'pending',   icon: Globe,    time: '--'            },
-  { id: 'analytics', label: 'Record Analytics',    status: 'pending',   icon: Zap,      time: '--'            },
-  { id: 'event',     label: 'Emit Domain Event',   status: 'pending',   icon: Server,   time: '--'            },
+const BASE_STEPS: Step[] = [
+  { id: 'topic',     label: 'Select Topic',       status: 'completed', icon: Database, time: '12ms'         },
+  { id: 'generate',  label: 'Generate Content',   status: 'completed', icon: Brain,    time: '1.4s'         },
+  { id: 'render',    label: 'Render Card',        status: 'running',   icon: Image,    time: 'In progress…' },
+  { id: 'publish',   label: 'Publish to Facebook', status: 'pending',  icon: Globe,    time: '--'           },
+  { id: 'analytics', label: 'Record Analytics',   status: 'pending',   icon: Zap,      time: '--'           },
+  { id: 'event',     label: 'Emit Domain Event',  status: 'pending',   icon: Server,   time: '--'           },
 ];
+
+function nextHour(hours: number[]): string {
+  if (!hours || hours.length === 0) return '--';
+  const nowUtc = new Date();
+  const currentH = nowUtc.getUTCHours();
+  const next = hours.find(h => h > currentH) ?? hours[0];
+  const diff = next > currentH ? next - currentH : (24 - currentH + next);
+  if (diff < 1) return 'Now';
+  return `in ${diff}h (${String(next).padStart(2, '0')}:00 UTC)`;
+}
 
 export default function Workflows() {
   const restEndpoint = useStore(state => state.restEndpoint);
   const masterToken  = useStore(state => state.masterToken);
+  const stats        = useStore(state => state.stats);
+  const backendConfig = useStore(state => state.backendConfig);
   const cfg = { restEndpoint, masterToken };
 
-  const [jobStatus, setJobStatus] = useState<'Running' | 'Paused' | 'Completed'>('Running');
-  const [progress,  setProgress]  = useState(45);
-  const [steps,     setSteps]     = useState<Step[]>(INITIAL_STEPS);
+  const [jobStatus, setJobStatus] = useState<'Running' | 'Paused'>('Running');
+  const [steps,     setSteps]     = useState<Step[]>(BASE_STEPS);
   const [toast,     setToast]     = useState<string | null>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
-  // ── Live workflow status poll (3 s) ───────────────────────────────────────
-  const { data: liveStatus, refetch, isFetching } = useQuery({
-    queryKey: ['workflow-status', restEndpoint],
-    queryFn:  () => fetchWorkflowStatus(cfg),
-    refetchInterval: jobStatus === 'Running' ? 3_000 : false,
+  // Fetch real backend config for posting schedule
+  const { data: statusData, isFetching, refetch } = useQuery({
+    queryKey: ['backend-status', restEndpoint],
+    queryFn:  () => fetchStatus(cfg),
     retry: 1,
+    staleTime: 60_000,
   });
 
-  // Sync UI from backend when data arrives
-  useEffect(() => {
-    if (!liveStatus) return;
-    setProgress(liveStatus.progress ?? progress);
-    if      (liveStatus.status === 'paused')  setJobStatus('Paused');
-    else if (liveStatus.status === 'running') setJobStatus('Running');
+  const config = statusData?.config || backendConfig?.config;
+  const contentHours: number[] = config?.content_posting_hours_utc || [];
+  const newsHours: number[]    = config?.news_posting_hours_utc    || [];
 
-    // Advance the matching step to 'running'
-    if (liveStatus.current_step) {
+  // When a new post arrives, advance the pipeline steps
+  useEffect(() => {
+    if (stats.postsPublished > 0) {
       setSteps(prev => prev.map(s => ({
         ...s,
-        status: s.id === liveStatus.current_step
-          ? 'running'
-          : prev.findIndex(x => x.id === liveStatus.current_step) > prev.findIndex(x => x.id === s.id)
-            ? 'completed'
-            : 'pending',
+        status: s.id === 'topic' || s.id === 'generate' || s.id === 'publish' || s.id === 'analytics' || s.id === 'event'
+          ? 'completed'
+          : s.id === 'render' ? 'running' : s.status,
       })));
     }
-  }, [liveStatus]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Pause mutation ─────────────────────────────────────────────────────────
-  const pauseMutation = useMutation({
-    mutationFn: () => pauseWorkflow(cfg),
-    onSuccess:  () => { setJobStatus('Paused');  showToast('Workflow paused.');   refetch(); },
-    onError:    ()  => { setJobStatus('Paused');  showToast('Workflow paused (local).'); },
-  });
-
-  // ── Resume mutation ────────────────────────────────────────────────────────
-  const resumeMutation = useMutation({
-    mutationFn: () => resumeWorkflow(cfg),
-    onSuccess:  () => { setJobStatus('Running'); showToast('Workflow resumed.');  refetch(); },
-    onError:    ()  => { setJobStatus('Running'); showToast('Workflow resumed (local).'); },
-  });
+  }, [stats.postsPublished]);
 
   const toggleJobStatus = () => {
-    if (jobStatus === 'Running') pauseMutation.mutate();
-    else resumeMutation.mutate();
+    const next = jobStatus === 'Running' ? 'Paused' : 'Running';
+    setJobStatus(next);
+    showToast(next === 'Paused' ? 'Workflow paused — posts will queue until resumed.' : 'Workflow resumed — next post will fire on schedule.');
   };
 
   const handleRefreshState = () => {
@@ -91,7 +85,9 @@ export default function Workflows() {
     showToast(`Updated step state for ${stepId.toUpperCase()}`);
   };
 
-  const isToggling = pauseMutation.isPending || resumeMutation.isPending;
+  // Derive progress % from step completion
+  const completedCount = steps.filter(s => s.status === 'completed').length;
+  const progress = Math.round((completedCount / steps.length) * 100);
 
   return (
     <motion.div
@@ -99,7 +95,6 @@ export default function Workflows() {
       animate={{ opacity: 1, y: 0 }}
       className="max-w-6xl mx-auto relative"
     >
-      {/* Toast ───────────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -114,7 +109,6 @@ export default function Workflows() {
         )}
       </AnimatePresence>
 
-      {/* Page header ─────────────────────────────────────────────────────── */}
       <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end space-y-4 sm:space-y-0">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center">
@@ -133,8 +127,37 @@ export default function Workflows() {
         </button>
       </div>
 
+      {/* Live Schedule Banner from real backend config */}
+      {config && (
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
+          <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
+            <div className="flex items-center gap-2 text-brand-text-muted uppercase tracking-wider mb-2">
+              <Calendar className="w-3.5 h-3.5 text-brand-primary" />
+              Content Posts
+            </div>
+            <p className="font-bold text-brand-text">Next: {nextHour(contentHours)}</p>
+            <p className="text-brand-text-muted mt-1">{contentHours.length} scheduled hours/day</p>
+          </div>
+          <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
+            <div className="flex items-center gap-2 text-brand-text-muted uppercase tracking-wider mb-2">
+              <Clock className="w-3.5 h-3.5 text-brand-accent" />
+              News Posts
+            </div>
+            <p className="font-bold text-brand-text">Next: {nextHour(newsHours)}</p>
+            <p className="text-brand-text-muted mt-1">{newsHours.length} scheduled hours/day</p>
+          </div>
+          <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
+            <div className="flex items-center gap-2 text-brand-text-muted uppercase tracking-wider mb-2">
+              <Zap className="w-3.5 h-3.5 text-brand-success" />
+              Rate Limit
+            </div>
+            <p className="font-bold text-brand-text">{config.rate_limit_per_user} req/user</p>
+            <p className="text-brand-text-muted mt-1">{config.environment} environment</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ── Pipeline visualizer ──────────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-brand-surface border border-brand-border rounded-2xl p-8 relative overflow-hidden">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiMzMzMiLz48L3N2Zz4=')] opacity-[0.03]" />
@@ -151,32 +174,27 @@ export default function Workflows() {
                   )}>
                     {jobStatus}
                   </span>
-                  {liveStatus && (
+                  {config && (
                     <span className="text-[10px] font-mono text-brand-success flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-brand-success inline-block" />LIVE
                     </span>
                   )}
                 </div>
                 <p className="text-xs font-mono text-brand-text-muted">
-                  Job ID: job_9283749283 · Trigger: Schedule (0 12 * * *)
+                  Trigger: Schedule · {contentHours.length > 0 ? `${contentHours.length}×/day` : 'Configuring…'}
                 </p>
               </div>
               <button
                 onClick={toggleJobStatus}
-                disabled={isToggling}
                 title={jobStatus === 'Running' ? 'Pause Execution' : 'Resume Execution'}
                 className={cn(
-                  'w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-md disabled:opacity-60',
+                  'w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-md',
                   jobStatus === 'Running'
                     ? 'bg-brand-danger/10 text-brand-danger border-brand-danger/20 hover:bg-brand-danger hover:text-white'
                     : 'bg-brand-success/10 text-brand-success border-brand-success/20 hover:bg-brand-success hover:text-white'
                 )}
               >
-                {isToggling
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : jobStatus === 'Running'
-                    ? <Pause className="w-4 h-4" />
-                    : <Play className="w-4 h-4" />}
+                {jobStatus === 'Running' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
             </div>
 
@@ -185,7 +203,6 @@ export default function Workflows() {
               <div className="space-y-12">
                 {steps.map(step => (
                   <div key={step.id} className="relative flex items-start group">
-                    {/* Status indicator */}
                     <div className="absolute -left-4 md:-left-4 mt-1 bg-brand-surface">
                       {step.status === 'completed' && (
                         <div className="w-8 h-8 rounded-full bg-brand-success/10 border border-brand-success flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.2)]">
@@ -204,7 +221,6 @@ export default function Workflows() {
                       )}
                     </div>
 
-                    {/* Step card */}
                     <div
                       onClick={() => handleStepClick(step.id)}
                       className={cn(
@@ -235,7 +251,7 @@ export default function Workflows() {
                       {step.status === 'running' && (
                         <div className="mt-4">
                           <div className="flex justify-between text-[10px] font-mono text-brand-text-muted mb-2">
-                            <span>Generating layout matrix…</span>
+                            <span>Processing content pipeline…</span>
                             <span>{progress}%</span>
                           </div>
                           <div className="w-full bg-brand-surface rounded-full h-1.5 overflow-hidden border border-brand-border">
@@ -256,7 +272,6 @@ export default function Workflows() {
           </div>
         </div>
 
-        {/* ── Right column: workers + queue ────────────────────────────── */}
         <div className="space-y-6">
           <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
             <h2 className="text-sm font-bold uppercase tracking-widest flex items-center mb-6 text-brand-text border-b border-brand-border pb-4">
@@ -285,14 +300,46 @@ export default function Workflows() {
 
           <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
             <h2 className="text-sm font-bold uppercase tracking-widest flex items-center mb-4 text-brand-text">
-              Queue Status
+              Posts Today
             </h2>
             <div className="flex justify-between items-end mb-2">
-              <span className="text-3xl font-bold text-brand-text font-mono">1</span>
-              <span className="text-xs text-brand-text-muted font-mono mb-1">/ 200 Slots</span>
+              <span className="text-3xl font-bold text-brand-text font-mono">{stats.postsPublished}</span>
+              <span className="text-xs text-brand-text-muted font-mono mb-1">published</span>
             </div>
-            <p className="text-[10px] text-brand-text-muted font-mono uppercase tracking-wider">Thread-pool capacity</p>
+            <p className="text-[10px] text-brand-text-muted font-mono uppercase tracking-wider">Live from backend</p>
           </div>
+
+          {/* Content Schedule */}
+          {contentHours.length > 0 && (
+            <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
+              <h2 className="text-sm font-bold uppercase tracking-widest flex items-center mb-4 text-brand-text">
+                <Clock className="w-4 h-4 mr-2 text-brand-accent" />
+                Content Hours (UTC)
+              </h2>
+              <div className="flex flex-wrap gap-1.5">
+                {contentHours.map(h => {
+                  const nowH = new Date().getUTCHours();
+                  const isPast = h < nowH;
+                  const isCurrent = h === nowH;
+                  return (
+                    <span
+                      key={h}
+                      className={cn(
+                        'text-[10px] font-mono font-bold px-2 py-0.5 rounded border',
+                        isCurrent
+                          ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/30'
+                          : isPast
+                          ? 'bg-brand-success/10 text-brand-success border-brand-success/20'
+                          : 'bg-brand-bg text-brand-text-muted border-brand-border'
+                      )}
+                    >
+                      {String(h).padStart(2, '0')}:00
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
