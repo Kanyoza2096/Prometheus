@@ -54,8 +54,8 @@ export function ResourceRadar() {
   const { data: resources } = useQuery({
     queryKey: ['resources', restEndpoint],
     queryFn:  () => fetchResources(cfg),
-    refetchInterval: 10_000,
-    retry: 1,
+    refetchInterval: 30_000,
+    retry: 0, // endpoint may not exist on backend — fail silently and use fallback
   });
 
   const radarData = resources ? toRadarData(resources) : RADAR_FALLBACK;
@@ -105,8 +105,8 @@ export function TrafficComposedChart() {
   const { data: resources } = useQuery({
     queryKey: ['resources', restEndpoint],
     queryFn:  () => fetchResources(cfg),
-    refetchInterval: 10_000,
-    retry: 1,
+    refetchInterval: 30_000,
+    retry: 0,
   });
 
   // Rolling window of traffic data points

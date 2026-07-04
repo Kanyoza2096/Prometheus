@@ -215,7 +215,14 @@ export const useStore = create<AppState>((set, get) => ({
     // a sync worker (sync workers cannot upgrade HTTP→WebSocket).
     // Socket.IO will automatically upgrade to WebSocket once the
     // eventlet/gevent worker is in place on the backend.
-    const base = get().wsEndpoint.replace(/\/+$/, '');
+    // Normalise ws(s):// → http(s):// so socket.io's HTTP polling handshake works.
+    // Socket.IO starts with an HTTP POST /socket.io/?EIO=4&transport=polling — passing
+    // a wss:// URL breaks that phase entirely, which is why no /socket.io/ requests
+    // appear in server logs at all.
+    const rawBase = get().wsEndpoint.replace(/\/+$/, '');
+    const base = rawBase
+      .replace(/^wss:\/\//i, 'https://')
+      .replace(/^ws:\/\//i,  'http://');
     const socket = io(`${base}/dashboard`, {
       transports: ['polling', 'websocket'],
       reconnectionDelay: 1000,
