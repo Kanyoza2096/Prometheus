@@ -251,6 +251,8 @@ export const useStore = create<AppState>((set, get) => ({
         socketTransport: transport,
         socketLastEventAt: Date.now(),
       });
+      // Request current state from backend immediately on connect
+      socket.emit('request_initial_state');
     });
 
     // Track transport upgrades (polling -> websocket) once the handshake completes.
