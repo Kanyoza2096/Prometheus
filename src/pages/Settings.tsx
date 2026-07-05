@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User, Bell, Palette, HardDrive, Terminal, Key, Database, Globe, Check, X, Shield, Sliders, Download, Trash2, Info, Brain } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
+import SocketDebugPanel from '../components/SocketDebugPanel';
 
 const MOODS = [
   {
@@ -36,7 +37,7 @@ const MOODS = [
 ] as const;
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'general' | 'credentials'>('credentials');
+  const [activeTab, setActiveTab] = useState<'general' | 'credentials' | 'debug'>('credentials');
   const {
     wsEndpoint,
     restEndpoint,
@@ -247,6 +248,18 @@ export default function Settings() {
         >
           General Settings
           {activeTab === 'general' && (
+            <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary" />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('debug')}
+          className={cn(
+            "pb-3 text-sm font-bold uppercase tracking-wider transition-colors relative",
+            activeTab === 'debug' ? "text-brand-primary" : "text-brand-text-muted hover:text-brand-text"
+          )}
+        >
+          Debug Console
+          {activeTab === 'debug' && (
             <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary" />
           )}
         </button>
@@ -585,6 +598,16 @@ export default function Settings() {
               </button>
             </div>
           </div>
+        </motion.div>
+      )}
+
+      {activeTab === 'debug' && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="space-y-6"
+        >
+          <SocketDebugPanel />
         </motion.div>
       )}
 
