@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { AlertTriangle, RotateCw } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export type OrbState = 'live' | 'partial' | 'offline' | 'connecting';
@@ -166,6 +167,8 @@ interface ConnectionOrbProps {
   latencyHistory?: number[];
   compact?: boolean;
   className?: string;
+  socketError?: string | null;
+  socketReconnectAttempts?: number;
 }
 
 export function ConnectionOrb({
@@ -174,6 +177,8 @@ export function ConnectionOrb({
   latencyHistory = [],
   compact = false,
   className,
+  socketError = null,
+  socketReconnectAttempts = 0,
 }: ConnectionOrbProps) {
   const [booting, setBooting] = useState(true);
   useEffect(() => {
@@ -291,8 +296,16 @@ export function ConnectionOrb({
             {cfg.label}
           </motion.p>
           <p className="text-[9px] text-brand-text-muted font-mono tracking-wider">
-            {cfg.sublabel}
+            {!socketConnected && socketReconnectAttempts > 0
+              ? `Retrying… attempt ${socketReconnectAttempts}`
+              : cfg.sublabel}
           </p>
+          {socketError && (
+            <p className="text-[8px] text-brand-danger font-mono tracking-wide text-center max-w-[160px] leading-snug mt-1 flex items-center gap-1">
+              <AlertTriangle className="w-2.5 h-2.5 flex-shrink-0" />
+              {socketError}
+            </p>
+          )}
         </motion.div>
       </AnimatePresence>
 
@@ -329,44 +342,122 @@ const PILL_COLOR: Record<OrbState, string> = {
 export function ConnectionBadge({
   socketConnected,
   isUsingLiveBackendData,
+  socketError = null,
+  socketReconnectAttempts = 0,
+  socketTransport = null,
 }: {
   socketConnected: boolean;
   isUsingLiveBackendData: boolean;
+  socketError?: string | null;
+  socketReconnectAttempts?: number;
+  socketTransport?: 'polling' | 'websocket' | null;
 }) {
   const [booting, setBooting] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const t = setTimeout(() => setBooting(false), 2500);
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
   const state = deriveState(socketConnected, isUsingLiveBackendData, booting);
+  const isRetrying = !socketConnected && !booting && socketReconnectAttempts > 0;
+  const hasIssue = !!socketError || isRetrying;
 
   return (
-    <motion.div
-      layout
-      className={cn(
-        'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center border gap-2',
-        PILL_COLOR[state],
-      )}
-      transition={{ duration: 0.35 }}
-    >
-      <ConnectionOrb
-        socketConnected={socketConnected}
-        isUsingLiveBackendData={isUsingLiveBackendData}
-        compact
-      />
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={state}
-          initial={{ opacity: 0, x: -4 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 4 }}
-          transition={{ duration: 0.25 }}
-          className="whitespace-nowrap"
-        >
-          {CFG[state].label}
-        </motion.span>
+    <div className="relative" ref={wrapperRef}>
+      <motion.button
+        layout
+        onClick={() => hasIssue && setIsOpen(v => !v)}
+        className={cn(
+          'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center border gap-2 transition-shadow',
+          PILL_COLOR[state],
+          hasIssue && 'cursor-pointer hover:brightness-125',
+        )}
+        transition={{ duration: 0.35 }}
+      >
+        <ConnectionOrb
+          socketConnected={socketConnected}
+          isUsingLiveBackendData={isUsingLiveBackendData}
+          compact
+        />
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={state}
+            initial={{ opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 4 }}
+            transition={{ duration: 0.25 }}
+            className="whitespace-nowrap"
+          >
+            {isRetrying ? `RECONNECTING (${socketReconnectAttempts})` : CFG[state].label}
+          </motion.span>
+        </AnimatePresence>
+        {hasIssue && (
+          <motion.span
+            animate={{ rotate: isRetrying ? 360 : 0 }}
+            transition={isRetrying ? { repeat: Infinity, duration: 1.4, ease: 'linear' } : { duration: 0.2 }}
+          >
+            {isRetrying ? <RotateCw className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+          </motion.span>
+        )}
+      </motion.button>
+
+      <AnimatePresence>
+        {isOpen && hasIssue && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.97 }}
+            transition={{ duration: 0.2 }}
+            className="absolute left-0 mt-2 w-80 bg-brand-surface border border-brand-border rounded-2xl shadow-2xl p-4 z-50 font-mono"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-4 h-4 text-brand-danger" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-brand-text">
+                WebSocket Connection Issue
+              </h3>
+            </div>
+
+            <div className="space-y-2 text-[11px]">
+              <div className="flex justify-between items-center">
+                <span className="text-brand-text-muted uppercase tracking-wider">Status</span>
+                <span className="text-brand-danger font-bold">{socketConnected ? 'Connected' : 'Disconnected'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-brand-text-muted uppercase tracking-wider">Transport</span>
+                <span className="text-brand-text">{socketTransport ?? '—'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-brand-text-muted uppercase tracking-wider">Reconnect attempts</span>
+                <span className="text-brand-text tabular-nums">{socketReconnectAttempts}</span>
+              </div>
+            </div>
+
+            {socketError && (
+              <div className="mt-3 px-3 py-2 bg-brand-danger/10 border border-brand-danger/20 rounded-lg text-[10px] text-brand-danger leading-relaxed break-words">
+                {socketError}
+              </div>
+            )}
+
+            <p className="mt-3 text-[9px] text-brand-text-muted leading-relaxed">
+              Check the backend's WS endpoint and master token in Settings. If this persists,
+              the backend's real-time server may be down or misconfigured.
+            </p>
+          </motion.div>
+        )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }

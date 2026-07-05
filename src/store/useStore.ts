@@ -83,6 +83,10 @@ interface AppState {
 
   socket: Socket | null;
   socketConnected: boolean;
+  socketTransport: 'polling' | 'websocket' | null;
+  socketError: string | null;
+  socketReconnectAttempts: number;
+  socketLastEventAt: number | null;
   connectSocket: () => void;
   disconnectSocket: () => void;
 
@@ -204,6 +208,10 @@ export const useStore = create<AppState>((set, get) => ({
 
   socket: null,
   socketConnected: false,
+  socketTransport: null,
+  socketError: null,
+  socketReconnectAttempts: 0,
+  socketLastEventAt: null,
   connectSocket: () => {
     if (get().socket) return;
     
@@ -234,8 +242,66 @@ export const useStore = create<AppState>((set, get) => ({
       }
     });
 
-    socket.on('connect', () => set({ socketConnected: true }));
-    socket.on('disconnect', () => set({ socketConnected: false }));
+    socket.on('connect', () => {
+      const transport = socket.io.engine?.transport?.name === 'websocket' ? 'websocket' : 'polling';
+      set({
+        socketConnected: true,
+        socketError: null,
+        socketReconnectAttempts: 0,
+        socketTransport: transport,
+        socketLastEventAt: Date.now(),
+      });
+    });
+
+    // Track transport upgrades (polling -> websocket) once the handshake completes.
+    socket.io.engine?.on?.('upgrade', (transport: any) => {
+      set({ socketTransport: transport?.name === 'websocket' ? 'websocket' : 'polling' });
+    });
+
+    socket.on('disconnect', (reason: string) => {
+      set({
+        socketConnected: false,
+        socketTransport: null,
+        socketError: `Disconnected: ${reason}`,
+        socketLastEventAt: Date.now(),
+      });
+    });
+
+    // Fired when the initial connection (or a reconnection attempt) fails —
+    // this is where the real reason (CORS, auth rejected, timeout, refused, etc.) shows up.
+    socket.on('connect_error', (err: any) => {
+      const message = err?.message || String(err) || 'Unknown connection error';
+      set({
+        socketConnected: false,
+        socketError: message,
+        socketLastEventAt: Date.now(),
+      });
+    });
+
+    socket.io.on('reconnect_attempt', (attempt: number) => {
+      set({ socketReconnectAttempts: attempt, socketLastEventAt: Date.now() });
+    });
+
+    socket.io.on('reconnect', (attempt: number) => {
+      set({
+        socketConnected: true,
+        socketError: null,
+        socketReconnectAttempts: 0,
+        socketLastEventAt: Date.now(),
+      });
+    });
+
+    socket.io.on('reconnect_error', (err: any) => {
+      const message = err?.message || String(err) || 'Reconnect error';
+      set({ socketError: message, socketLastEventAt: Date.now() });
+    });
+
+    socket.io.on('reconnect_failed', () => {
+      set({
+        socketError: 'Reconnection failed — max attempts reached. Backend may be unreachable or crashed.',
+        socketLastEventAt: Date.now(),
+      });
+    });
     
     socket.on('new_message', (msg: LiveMessage) => {
       if (!get().isStreamPaused) {
@@ -293,7 +359,13 @@ export const useStore = create<AppState>((set, get) => ({
     const { socket } = get();
     if (socket) {
       socket.disconnect();
-      set({ socket: null, socketConnected: false });
+      set({
+        socket: null,
+        socketConnected: false,
+        socketTransport: null,
+        socketError: null,
+        socketReconnectAttempts: 0,
+      });
     }
   },
 

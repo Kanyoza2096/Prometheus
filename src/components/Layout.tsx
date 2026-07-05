@@ -33,6 +33,7 @@ export default function Layout() {
     guardianAlerts, toggleTerminal, setPendingCommand, fetchInitialData, isUsingLiveBackendData,
     personaMood, restEndpoint, masterToken, latencyHistory, pushLatency,
     startRealtimeSubscriptions, stopRealtimeSubscriptions,
+    socketError, socketReconnectAttempts, socketTransport,
   } = useStore();
 
   const MOOD_META: Record<string, { emoji: string; color: string }> = {
@@ -176,6 +177,8 @@ export default function Layout() {
               socketConnected={socketConnected}
               isUsingLiveBackendData={isUsingLiveBackendData}
               latencyHistory={latencyHistory}
+              socketError={socketError}
+              socketReconnectAttempts={socketReconnectAttempts}
             />
           </div>
           <button
@@ -200,6 +203,9 @@ export default function Layout() {
             <ConnectionBadge
               socketConnected={socketConnected}
               isUsingLiveBackendData={isUsingLiveBackendData}
+              socketError={socketError}
+              socketReconnectAttempts={socketReconnectAttempts}
+              socketTransport={socketTransport}
             />
           </div>
 
