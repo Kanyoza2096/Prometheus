@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { io, Socket } from 'socket.io-client';
-import { Terminal, Play, Square, Trash2, Radio, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Terminal, Play, Square, Trash2, Radio, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Copy, Check, Code2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
 
@@ -37,9 +37,12 @@ export default function SocketDebugPanel() {
   const [useWebsocket, setUseWebsocket] = useState(true);
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [logs, setLogs] = useState<LogLine[]>([]);
+  const [copiedKind, setCopiedKind] = useState<'js' | 'curl' | null>(null);
+  const [lastWorkingTransport, setLastWorkingTransport] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pushLog = useCallback((level: LogLevel, text: string) => {
     setLogs(prev => [
@@ -92,10 +95,13 @@ export default function SocketDebugPanel() {
 
     socket.on('connect', () => {
       setStatus('connected');
-      pushLog('success', `Connected. Transport: ${socket.io.engine?.transport?.name ?? 'unknown'}. Socket ID: ${socket.id}`);
+      const t = socket.io.engine?.transport?.name ?? 'unknown';
+      setLastWorkingTransport(t);
+      pushLog('success', `Connected. Transport: ${t}. Socket ID: ${socket.id}`);
     });
 
     socket.io.engine?.on?.('upgrade', (t: any) => {
+      setLastWorkingTransport(t?.name ?? null);
       pushLog('info', `Transport upgraded to: ${t?.name}`);
     });
 
