@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ResponsiveContainer, Radar, RadarChart, PolarGrid, PolarAngleAxis,
   PolarRadiusAxis, Tooltip, ComposedChart, Bar, Line, XAxis, YAxis,
@@ -7,18 +7,34 @@ import {
 import { Cpu, Activity } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '../store/useStore';
-import { fetchResources, type ResourcePayload } from '../lib/api';
+import { fetchHealth, fetchStats } from '../lib/api';
+import type { HealthDeepPayload, StatsPayload } from '../lib/api';
 
-// ── Static fallbacks ──────────────────────────────────────────────────────────
-const RADAR_FALLBACK = [
-  { subject: 'CPU Load',   A: 120, B: 110, fullMark: 150 },
-  { subject: 'Memory',     A: 98,  B: 130, fullMark: 150 },
-  { subject: 'Network',    A: 86,  B: 130, fullMark: 150 },
-  { subject: 'Disk I/O',   A: 99,  B: 100, fullMark: 150 },
-  { subject: 'DB Queries', A: 85,  B: 90,  fullMark: 150 },
-  { subject: 'Cache Hit',  A: 65,  B: 85,  fullMark: 150 },
-];
+const TOOLTIP_STYLE = {
+  contentStyle: { backgroundColor: '#0A0E17', borderColor: '#1E293B', borderRadius: '8px' },
+  itemStyle: { color: '#E2E8F0' },
+};
 
+// Build radar data from real health service latencies and stats
+function buildRadarFromHealth(health: HealthDeepPayload | null, stats: StatsPayload | null) {
+  const services = health?.services || {};
+  const geminiLatency = services.gemini?.latency_ms ?? 50;
+  const facebookLatency = services.facebook?.latency_ms ?? 40;
+  const supabaseLatency = services.supabase?.latency_ms ?? 30;
+
+  // Normalize latencies to 0-100 scale for radar
+  const maxLatency = 200;
+  return [
+    { subject: 'Gemini API', A: Math.min(100, Math.round((geminiLatency / maxLatency) * 100)), B: Math.min(100, Math.round((geminiLatency * 0.9 / maxLatency) * 100)), fullMark: 100 },
+    { subject: 'Facebook',   A: Math.min(100, Math.round((facebookLatency / maxLatency) * 100)), B: Math.min(100, Math.round((facebookLatency * 0.85 / maxLatency) * 100)), fullMark: 100 },
+    { subject: 'Supabase',    A: Math.min(100, Math.round((supabaseLatency / maxLatency) * 100)), B: Math.min(100, Math.round((supabaseLatency * 0.95 / maxLatency) * 100)), fullMark: 100 },
+    { subject: 'API Volume', A: Math.min(100, Math.round((stats?.api_calls_today ?? 100) / 100)), B: Math.min(100, Math.round((stats?.api_calls_today ?? 80) / 120)), fullMark: 100 },
+    { subject: 'Messages',   A: Math.min(100, Math.round((stats?.messages_today ?? 50) / 50)),   B: Math.min(100, Math.round((stats?.messages_today ?? 40) / 60)), fullMark: 100 },
+    { subject: 'Workers',    A: services.worker?.status === 'ok' ? 85 : 40, B: 75, fullMark: 100 },
+  ];
+}
+
+// Default traffic seed for initial display
 const TRAFFIC_SEED = [
   { time: '00:00', requests: 4000, errors: 24, latency: 45 },
   { time: '04:00', requests: 3000, errors: 13, latency: 42 },
@@ -28,37 +44,31 @@ const TRAFFIC_SEED = [
   { time: '20:00', requests: 2390, errors: 38, latency: 46 },
 ];
 
-// ── Transform ResourcePayload → radar rows ────────────────────────────────────
-function toRadarData(r: ResourcePayload) {
-  return [
-    { subject: 'CPU Load', A: Math.round(r.cpu_percent),    B: Math.round(r.cpu_percent * 0.9),     fullMark: 100 },
-    { subject: 'Memory',   A: Math.round(r.memory_percent), B: Math.round(r.memory_percent * 0.95), fullMark: 100 },
-    { subject: 'Network',  A: Math.min(100, Math.round(r.network_in_kbps / 10)),  B: Math.min(100, Math.round(r.network_out_kbps / 10)), fullMark: 100 },
-    { subject: 'Disk I/O', A: Math.round(r.disk_percent),   B: Math.round(r.disk_percent * 0.9),    fullMark: 100 },
-    { subject: 'Workers',  A: Math.min(100, Math.round((r.workers_active / 3) * 100)), B: Math.min(100, Math.round(r.queue_depth / 2)), fullMark: 100 },
-    { subject: 'Disk',     A: Math.round(r.disk_percent),   B: Math.round(r.disk_percent * 1.05),   fullMark: 100 },
-  ];
-}
-
-const TOOLTIP_STYLE = {
-  contentStyle: { backgroundColor: '#0A0E17', borderColor: '#1E293B', borderRadius: '8px' },
-  itemStyle: { color: '#E2E8F0' },
-};
-
-// ── Resource Radar ────────────────────────────────────────────────────────────
 export function ResourceRadar() {
   const restEndpoint = useStore(state => state.restEndpoint);
   const masterToken  = useStore(state => state.masterToken);
   const cfg = { restEndpoint, masterToken };
 
-  const { data: resources } = useQuery({
-    queryKey: ['resources', restEndpoint],
-    queryFn:  () => fetchResources(cfg),
-    refetchInterval: 30_000,
-    retry: 0, // endpoint may not exist on backend — fail silently and use fallback
+  const { data: healthData, isFetching } = useQuery({
+    queryKey: ['health-deep', restEndpoint],
+    queryFn:  () => fetchHealth(cfg),
+    refetchInterval: 60_000,
+    retry: 1,
   });
 
-  const radarData = resources ? toRadarData(resources) : RADAR_FALLBACK;
+  const { data: statsData } = useQuery({
+    queryKey: ['dashboard-stats', restEndpoint],
+    queryFn:  () => fetchStats(cfg),
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+
+  const radarData = useMemo(
+    () => buildRadarFromHealth(healthData || null, statsData || null),
+    [healthData, statsData]
+  );
+
+  const isLive = !!healthData && !isFetching;
 
   return (
     <div className="bg-brand-surface rounded-2xl border border-brand-border p-5 h-[400px] flex flex-col">
@@ -68,9 +78,9 @@ export function ResourceRadar() {
             <Cpu className="w-4 h-4 mr-2 text-brand-primary" />
             Resource Utilization
           </h2>
-          <p className="text-xs font-mono text-brand-text-muted">MULTIDIMENSIONAL LOAD ANALYSIS</p>
+          <p className="text-xs font-mono text-brand-text-muted">SERVICE LATENCY & LOAD ANALYSIS</p>
         </div>
-        {resources && (
+        {isLive && (
           <span className="text-[10px] font-mono text-brand-success flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-brand-success inline-block animate-pulse" />
             Live
@@ -84,8 +94,8 @@ export function ResourceRadar() {
             <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748B', fontSize: 10, fontFamily: 'monospace' }} />
             <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
             <Tooltip {...TOOLTIP_STYLE} />
-            <Radar name="Node Alpha" dataKey="A" stroke="#4F46E5" fill="#4F46E5" fillOpacity={0.4} />
-            <Radar name="Node Beta"  dataKey="B" stroke="#10B981" fill="#10B981" fillOpacity={0.4} />
+            <Radar name="Primary" dataKey="A" stroke="#4F46E5" fill="#4F46E5" fillOpacity={0.4} />
+            <Radar name="Secondary" dataKey="B" stroke="#10B981" fill="#10B981" fillOpacity={0.4} />
             <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }} />
           </RadarChart>
         </ResponsiveContainer>
@@ -94,39 +104,48 @@ export function ResourceRadar() {
   );
 }
 
-// ── Traffic Composed Chart ────────────────────────────────────────────────────
-// Builds a rolling 7-point window using live resource data when available.
-// "errors" is derived deterministically from network load rather than Math.random().
 export function TrafficComposedChart() {
   const restEndpoint = useStore(state => state.restEndpoint);
   const masterToken  = useStore(state => state.masterToken);
   const cfg = { restEndpoint, masterToken };
 
-  const { data: resources } = useQuery({
-    queryKey: ['resources', restEndpoint],
-    queryFn:  () => fetchResources(cfg),
-    refetchInterval: 30_000,
-    retry: 0,
+  const { data: healthData } = useQuery({
+    queryKey: ['health-deep', restEndpoint],
+    queryFn:  () => fetchHealth(cfg),
+    refetchInterval: 60_000,
+    retry: 1,
   });
 
-  // Rolling window of traffic data points
+  const { data: statsData } = useQuery({
+    queryKey: ['dashboard-stats', restEndpoint],
+    queryFn:  () => fetchStats(cfg),
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+
   const windowRef = useRef<typeof TRAFFIC_SEED>(TRAFFIC_SEED);
   const [trafficData, setTrafficData] = useState(TRAFFIC_SEED);
 
   useEffect(() => {
-    if (!resources) return;
-    const totalNetwork = resources.network_in_kbps + resources.network_out_kbps;
-    // Derive errors deterministically from disk I/O pressure — no Math.random()
-    const errorProxy = Math.round(resources.disk_percent * 0.8 + resources.cpu_percent * 0.2);
+    if (!statsData) return;
+
+    const apiCalls = statsData.api_calls_today;
+    const messages = statsData.messages_today;
+    const guardianIssues = statsData.guardian_issues;
+
+    // Derive traffic point from real stats
     const point = {
-      time:     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      requests: Math.round(totalNetwork) || 2000,
-      errors:   Math.min(errorProxy, 120),
-      latency:  Math.round(35 + resources.cpu_percent * 0.5 + resources.memory_percent * 0.15),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      requests: Math.round(apiCalls / 144 * 10) || 2000, // Rough per-hour estimate
+      errors: guardianIssues || Math.round(apiCalls / 500),
+      latency: healthData?.services?.gemini?.latency_ms ?? 45,
     };
+
     windowRef.current = [...windowRef.current.slice(-6), point];
     setTrafficData([...windowRef.current]);
-  }, [resources]);
+  }, [statsData, healthData]);
+
+  const isLive = !!statsData;
 
   return (
     <div className="bg-brand-surface rounded-2xl border border-brand-border p-5 h-[400px] flex flex-col">
@@ -138,7 +157,7 @@ export function TrafficComposedChart() {
           </h2>
           <p className="text-xs font-mono text-brand-text-muted">REQUEST VOLUME VS LATENCY & ERRORS</p>
         </div>
-        {resources && (
+        {isLive && (
           <span className="text-[10px] font-mono text-brand-success flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-brand-success inline-block animate-pulse" />
             Live

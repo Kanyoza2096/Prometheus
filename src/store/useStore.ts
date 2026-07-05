@@ -158,7 +158,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({ isAuthenticated: false });
   },
 
-  wsEndpoint: localStorage.getItem('ws_endpoint') || import.meta.env.VITE_WS_ENDPOINT || 'wss://kanyoza-systems-bot.onrender.com',
+  wsEndpoint: localStorage.getItem('ws_endpoint') || import.meta.env.VITE_WS_ENDPOINT || 'https://kanyoza-systems-bot.onrender.com',
   restEndpoint: localStorage.getItem('rest_endpoint') || import.meta.env.VITE_REST_ENDPOINT || 'https://kanyoza-systems-bot.onrender.com/api/v1',
   masterToken: localStorage.getItem('master_token') || import.meta.env.VITE_MASTER_TOKEN || 'sk_live_default_token',
   setConnectionParams: (params) => {
