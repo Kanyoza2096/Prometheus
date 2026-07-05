@@ -158,7 +158,6 @@ export const fetchMetrics = (cfg: ApiConfig) =>
   request<MetricsPayload>(cfg, '/metrics');
 
 // ── Resources ─────────────────────────────────────────────────────────────────
-// NOTE: /metrics/resources may not exist on backend. Provide fallback behavior.
 
 export interface ResourcePayload {
   cpu_percent: number;
@@ -169,15 +168,8 @@ export interface ResourcePayload {
   workers_active: number;
   queue_depth: number;
 }
-
-export const fetchResources = async (cfg: ApiConfig): Promise<ResourcePayload | null> => {
-  try {
-    return await request<ResourcePayload>(cfg, '/metrics/resources');
-  } catch {
-    // Endpoint doesn't exist or errored — return null so caller can use fallback
-    return null;
-  }
-};
+export const fetchResources = (cfg: ApiConfig) =>
+  request<ResourcePayload>(cfg, '/metrics/resources');
 
 // ── API Key management ────────────────────────────────────────────────────────
 
