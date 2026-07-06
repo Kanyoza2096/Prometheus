@@ -160,7 +160,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   wsEndpoint: localStorage.getItem('ws_endpoint') || import.meta.env.VITE_WS_ENDPOINT || 'wss://kanyoza-systems-bot.onrender.com',
   restEndpoint: localStorage.getItem('rest_endpoint') || import.meta.env.VITE_REST_ENDPOINT || 'https://kanyoza-systems-bot.onrender.com/api/v1',
-  masterToken: localStorage.getItem('master_token') || import.meta.env.VITE_MASTER_TOKEN || 'sk_live_default_token',
+  masterToken: localStorage.getItem('master_token') || import.meta.env.VITE_MASTER_TOKEN || '',
   setConnectionParams: (params) => {
     // Capture the previous endpoint BEFORE updating state so the comparison is valid
     const previousWsEndpoint = get().wsEndpoint;
@@ -575,6 +575,15 @@ export const useStore = create<AppState>((set, get) => ({
   fetchInitialData: async () => {
     const { restEndpoint, masterToken } = get();
     let loadedLive = false;
+
+    // Warn clearly when no master token is configured — every authenticated
+    // endpoint will return 401 without it. The user must set it in Settings.
+    if (!masterToken) {
+      console.warn(
+        '[Prometheus] masterToken is not set. All authenticated API calls will return 401. ' +
+        'Go to Settings and enter your MASTER_API_TOKEN from the backend environment.'
+      );
+    }
 
     // 1. Try querying Supabase if configured with real credentials
     if (isSupabaseConfigured()) {
