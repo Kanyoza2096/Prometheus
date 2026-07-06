@@ -100,7 +100,7 @@ export const fetchPersona = (cfg: ApiConfig) =>
 
 export const applyPersona = (cfg: ApiConfig, payload: PersonaPayload) =>
   request<{ ok: boolean }>(cfg, '/ai/persona', {
-    method: 'POST',
+    method: 'PUT',   // backend route is PUT /api/v1/ai/persona (was POST — mismatch bug fixed)
     body: JSON.stringify(payload),
   });
 

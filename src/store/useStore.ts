@@ -303,6 +303,35 @@ export const useStore = create<AppState>((set, get) => ({
       });
     });
     
+    // stats — emitted immediately on connect and on request_stats.
+    // build_live_stats() returns nested counters + top-level aliases.
+    socket.on('stats', (data: any) => {
+      if (!data || typeof data !== 'object') return;
+      // Top-level aliases added by the backend (messages_today, posts_published, etc.)
+      // Fall back to nested counters.messages_today for older backend versions.
+      const c = data.counters || {};
+      const a = data.analytics || {};
+      get().updateStats({
+        messagesToday:  data.messages_today   ?? a.messages_today  ?? c.messages_today  ?? get().stats.messagesToday,
+        postsPublished: data.posts_published  ?? a.posts_published ?? c.posts_today      ?? get().stats.postsPublished,
+        activeUsers:    data.active_users     ?? c.active_connections                    ?? get().stats.activeUsers,
+        apiCalls:       data.api_calls_today  ?? c.events_emitted                        ?? get().stats.apiCalls,
+        guardianIssues: data.guardian_issues  ?? get().stats.guardianIssues,
+      });
+      // Propagate service health from the stats snapshot when present
+      if (data.services && typeof data.services === 'object') {
+        const matrix: SystemHealth[] = Object.entries(data.services).map(([name, svc]: [string, any]) => ({
+          id:          name,
+          name:        (svc as any).page_name || name.charAt(0).toUpperCase() + name.slice(1),
+          status:      (svc as any).status === 'ok' ? 'online' : (svc as any).status === 'degraded' ? 'degraded' : 'offline',
+          latency:     (svc as any).latency_ms ?? 0,
+          lastChecked: Date.now(),
+          uptime:      (svc as any).status === 'ok' ? 99.9 : (svc as any).status === 'degraded' ? 85.0 : 0,
+        })) as SystemHealth[];
+        get().updateHealth(matrix);
+      }
+    });
+
     socket.on('new_message', (msg: LiveMessage) => {
       if (!get().isStreamPaused) {
         get().addMessage(msg);
@@ -315,21 +344,42 @@ export const useStore = create<AppState>((set, get) => ({
       set(state => ({ stats: { ...state.stats, postsPublished: state.stats.postsPublished + 1 } }));
     });
 
-    socket.on('api_call', (data?: any) => {
+    // api_payload — canonical event name emitted by the backend after_request hook.
+    // api_call    — alias also emitted by the backend for backward compatibility.
+    const _handleApiPayload = (data?: any) => {
        set(state => ({ stats: { ...state.stats, apiCalls: state.stats.apiCalls + 1 } }));
        if (data && typeof data === 'object') {
          get().addPayload({
-           id: data.id || `req_${Math.floor(Math.random() * 900000 + 100000)}`,
-           time: data.time || new Date().toLocaleTimeString(),
-           method: data.method || 'POST',
-           endpoint: data.endpoint || '/api/v1/webhook',
-           status: data.status || 200,
-           latency: data.latency || `${Math.floor(Math.random() * 200 + 50)}ms`,
-           type: data.type || 'inbound',
-           request: data.request || {},
+           id:       data.id       || `req_${Math.floor(Math.random() * 900000 + 100000)}`,
+           time:     data.time     || new Date().toLocaleTimeString(),
+           method:   data.method   || 'POST',
+           endpoint: data.endpoint || data.path || '/api/v1/webhook',
+           status:   data.status   || 200,
+           latency:  data.latency  || `${Math.floor(Math.random() * 200 + 50)}ms`,
+           type:     data.type     || 'inbound',
+           request:  data.request  || {},
            response: data.response || {}
          });
        }
+    };
+    socket.on('api_payload', _handleApiPayload);
+    socket.on('api_call',    _handleApiPayload);
+
+    // payload_inbound — raw Facebook webhook payloads forwarded by the backend.
+    socket.on('payload_inbound', (data?: any) => {
+      if (data && typeof data === 'object') {
+        get().addPayload({
+          id:       data.id       || `fb_${Math.floor(Math.random() * 900000 + 100000)}`,
+          time:     data.time     || new Date().toLocaleTimeString(),
+          method:   'POST',
+          endpoint: data.endpoint || '/webhook/facebook',
+          status:   data.status   || 200,
+          latency:  data.latency  || '0ms',
+          type:     'inbound',
+          request:  data.payload  || data.request || data,
+          response: data.response || {},
+        });
+      }
     });
 
     socket.on('payload', (data?: any) => {
@@ -344,11 +394,20 @@ export const useStore = create<AppState>((set, get) => ({
        }
     });
 
+    // service_status — backend can emit this when health changes.
+    // Also populated from the stats snapshot (see stats handler above).
     socket.on('service_status', (healthUpdates: SystemHealth[]) => {
       get().updateHealth(healthUpdates);
     });
 
-    socket.on('scan_complete', (alert: GuardianAlert) => {
+    socket.on('scan_complete', (data: any) => {
+      // Backend ScanCompletedEvent may use different field names; normalise here.
+      const alert: GuardianAlert = {
+        id:       data.id       || data.scan_id || `scan_${Date.now()}`,
+        severity: data.severity || (data.critical > 0 ? 'CRITICAL' : data.high > 0 ? 'HIGH' : 'MEDIUM'),
+        title:    data.title    || data.summary || `Scan complete — ${data.findings ?? 0} finding(s)`,
+        time:     data.time     || Date.now(),
+      };
       get().addAlert(alert);
       set(state => ({ stats: { ...state.stats, guardianIssues: state.stats.guardianIssues + 1 } }));
     });
@@ -561,17 +620,21 @@ export const useStore = create<AppState>((set, get) => ({
           headers['x-api-key'] = masterToken;
         }
 
-        // Try fetching live stats from real endpoint
+        // Try fetching live stats from real endpoint.
+        // build_live_stats() returns nested counters + top-level aliases (messages_today, etc.)
         const statsRes = await fetch(`${baseUrl}/dashboard/live`, { headers }).catch(() => null);
         if (statsRes && statsRes.ok) {
           const d = await statsRes.json();
           if (d) {
+            // Support both top-level aliases (new) and nested counters (legacy)
+            const c = d.counters || {};
+            const a = d.analytics || {};
             get().updateStats({
-              messagesToday:  d.messages_today   ?? 0,
-              postsPublished: d.posts_published  ?? 0,
-              activeUsers:    d.active_users      ?? 0,
-              apiCalls:       d.api_calls_today   ?? 0,
-              guardianIssues: d.guardian_issues   ?? 0,
+              messagesToday:  d.messages_today  ?? a.messages_today  ?? c.messages_today   ?? 0,
+              postsPublished: d.posts_published ?? a.posts_published ?? c.posts_today       ?? 0,
+              activeUsers:    d.active_users    ?? c.active_connections                     ?? 0,
+              apiCalls:       d.api_calls_today ?? c.events_emitted                         ?? 0,
+              guardianIssues: d.guardian_issues                                             ?? 0,
             });
             loadedLive = true;
           }
