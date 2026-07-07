@@ -1,1 +1,0 @@
-- [Missing @types/react](missing-types-react.md) — React 19 does NOT bundle its own TS types; @types/react@^19 must be installed separately or class components break entirely.
