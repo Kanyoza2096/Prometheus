@@ -62,6 +62,12 @@ interface AppState {
   isAuthenticated: boolean;
   login: () => void;
   logout: () => void;
+
+  theme: 'dark' | 'light';
+  toggleTheme: () => void;
+
+  currentTenant: string;
+  setCurrentTenant: (tenant: string) => void;
   
   wsEndpoint: string;
   restEndpoint: string;
@@ -150,12 +156,25 @@ const INITIAL_HEALTH: SystemHealth[] = [
 ];
 
 export const useStore = create<AppState>((set, get) => ({
-  isAuthenticated: false, // Set to true to skip login during dev if needed
+  isAuthenticated: false,
   login: () => set({ isAuthenticated: true }),
   logout: () => {
     get().disconnectSocket();
     get().stopRealtimeSubscriptions();
     set({ isAuthenticated: false });
+  },
+
+  theme: (localStorage.getItem('theme') as 'dark' | 'light') || 'dark',
+  toggleTheme: () => {
+    const next = get().theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('theme', next);
+    set({ theme: next });
+  },
+
+  currentTenant: localStorage.getItem('current_tenant') || 'Kanyoza Systems',
+  setCurrentTenant: (tenant) => {
+    localStorage.setItem('current_tenant', tenant);
+    set({ currentTenant: tenant });
   },
 
   wsEndpoint: localStorage.getItem('ws_endpoint') || import.meta.env.VITE_WS_ENDPOINT || 'wss://kanyoza-systems-bot.onrender.com',

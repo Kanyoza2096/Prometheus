@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Users, Plus, Search, Edit2, Trash2, Shield, Mail, Phone } from 'lucide-react';
+import { Users as UsersIcon, Plus, Search, Edit2, Trash2, Shield, Mail, Phone } from 'lucide-react';
 
 const usersData = [
   { id: 1, name: 'John Smith', email: 'john@example.com', role: 'Admin', status: 'active', joined: '2024-01-01' },
@@ -44,7 +44,7 @@ export default function Users() {
       >
         <div>
           <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center">
-            <Users className="w-8 h-8 mr-3 text-brand-primary" />
+            <UsersIcon className="w-8 h-8 mr-3 text-brand-primary" />
             Users
           </h1>
           <p className="text-brand-text-muted text-sm font-mono mt-1">USER MANAGEMENT & ADMINISTRATION</p>

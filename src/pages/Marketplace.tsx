@@ -1,151 +1,158 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { Store, Search, Plus, Star, Download } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Store, Search, Plus, Star, Download, Trash2, RefreshCw, CheckCircle, Upload } from 'lucide-react';
+import { cn } from '../lib/utils';
 
-const categories = ['All', 'Education', 'Healthcare', 'Business', 'Government', 'Finance', 'Social Media', 'CRM', 'ERP', 'Inventory', 'Church', 'Schools'];
+const categories = [
+  { name: 'All', count: 47 },
+  { name: 'Education', count: 8 },
+  { name: 'Healthcare', count: 5 },
+  { name: 'Business', count: 9 },
+  { name: 'Government', count: 3 },
+  { name: 'Finance', count: 6 },
+  { name: 'Social Media', count: 7 },
+  { name: 'CRM', count: 4 },
+  { name: 'ERP', count: 3 },
+  { name: 'Inventory', count: 2 },
+  { name: 'Church', count: 4 },
+  { name: 'Schools', count: 4 }
+];
 
 const plugins = [
-  { id: 1, name: 'School Manager Pro', category: 'Education', author: 'Kanyoza', rating: 4.8, downloads: 1245, price: 'Free', installed: true },
-  { id: 2, name: 'Healthcare Records', category: 'Healthcare', author: 'MedTech', rating: 4.6, downloads: 892, price: '$49', installed: false },
-  { id: 3, name: 'Business Analytics', category: 'Business', author: 'DataCorp', rating: 4.9, downloads: 2341, price: '$99', installed: true },
-  { id: 4, name: 'Government Portal', category: 'Government', author: 'GovTech', rating: 4.5, downloads: 567, price: 'Free', installed: false },
-  { id: 5, name: 'Finance Tracker', category: 'Finance', author: 'FinSys', rating: 4.7, downloads: 1567, price: '$79', installed: false },
-  { id: 6, name: 'Social Media Bot', category: 'Social Media', author: 'Kanyoza', rating: 4.8, downloads: 3421, price: 'Free', installed: true },
-  { id: 7, name: 'CRM Integration', category: 'CRM', author: 'SalesPro', rating: 4.4, downloads: 987, price: '$59', installed: false },
-  { id: 8, name: 'Church Management', category: 'Church', author: 'FaithTech', rating: 4.9, downloads: 765, price: 'Free', installed: true },
+  { id: 1, name: 'School Manager Pro', category: 'Education', author: 'Kanyoza Systems', version: 'v2.3.1', description: 'Comprehensive school management system with advanced reporting capabilities and parent portals.', rating: 4.8, downloads: '12k', price: 'Free', status: 'installed' },
+  { id: 2, name: 'Healthcare Records', category: 'Healthcare', author: 'MedTech Inc', version: 'v1.8.0', description: 'HIPAA compliant electronic health records management tailored for modern clinics.', rating: 4.5, downloads: '3.4k', price: '$49/mo', status: 'not_installed' },
+  { id: 3, name: 'Business Analytics Suite', category: 'Business', author: 'DataCorp', version: 'v3.1.0', description: 'Real-time business intelligence and visualization tools for enterprise decisions.', rating: 4.9, downloads: '25k', price: 'Free', status: 'installed' },
+  { id: 4, name: 'Government Portal', category: 'Government', author: 'GovTech Solutions', version: 'v1.2.0', description: 'Secure citizen services portal and comprehensive e-governance framework.', rating: 4.2, downloads: '1.2k', price: 'Free', status: 'not_installed' },
+  { id: 5, name: 'Finance Tracker Pro', category: 'Finance', author: 'FinSys', version: 'v2.0.1', description: 'Enterprise financial tracking, forecasting system, and tax compliance automation.', rating: 4.7, downloads: '8.9k', price: '$79/mo', status: 'not_installed' },
+  { id: 6, name: 'Social Media Bot', category: 'Social Media', author: 'Kanyoza Systems', version: 'v4.5.2', description: 'Automated social media engagement and scheduling across all major networks.', rating: 4.6, downloads: '45k', price: 'Free', status: 'installed' },
+  { id: 7, name: 'CRM Integration', category: 'CRM', author: 'SalesPro', version: 'v1.5.0', description: 'Seamless integration with major CRM providers to sync leads and customer data.', rating: 4.4, downloads: '5.6k', price: '$59/mo', status: 'not_installed' },
+  { id: 8, name: 'Church Management', category: 'Church', author: 'FaithTech', version: 'v2.1.0', description: 'Member management, giving tracking, event scheduling, and pastoral care tools.', rating: 4.9, downloads: '4.2k', price: 'Free', status: 'installed' },
+  { id: 9, name: 'ERP Connector', category: 'ERP', author: 'EnterpriseWorks', version: 'v1.0.3', description: 'Connect your existing legacy ERP system directly to the Kanyoza core platform.', rating: 4.1, downloads: '800', price: '$149/mo', status: 'not_installed' },
+  { id: 10, name: 'Inventory Manager', category: 'Inventory', author: 'StockFlow', version: 'v1.3.0', description: 'Multi-warehouse inventory tracking, barcodes, and automated low-stock alerts.', rating: 4.5, downloads: '2.1k', price: '$39/mo', status: 'not_installed' },
+  { id: 11, name: 'School MIS', category: 'Schools', author: 'EduTech', version: 'v3.0.0', description: 'Complete management information system optimized for primary and secondary schools.', rating: 4.7, downloads: '6.7k', price: 'Free', status: 'update_available' },
+  { id: 12, name: 'Hospital MIS', category: 'Healthcare', author: 'HealthSys', version: 'v2.2.0', description: 'Integrated hospital management, ward tracking, and automated billing system.', rating: 4.3, downloads: '1.5k', price: '$99/mo', status: 'not_installed' },
 ];
+
+const getInitials = (name: string) => name.split(' ').map(n=>n[0]).join('').substring(0,2);
 
 export default function Marketplace() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredPlugins = plugins.filter((plugin) => {
-    const matchesSearch = plugin.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = plugin.name.toLowerCase().includes(searchQuery.toLowerCase()) || plugin.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || plugin.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6 pb-20 md:pb-0"
-    >
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
-      >
+    <motion.div initial={{opacity:0}} animate={{opacity:1}} className="space-y-8 pb-20">
+      
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center">
-            <Store className="w-8 h-8 mr-3 text-brand-primary" />
-            Marketplace
-          </h1>
-          <p className="text-brand-text-muted text-sm font-mono mt-1">PLUGIN & EXTENSION MARKETPLACE</p>
+           <h1 className="text-3xl font-bold uppercase tracking-tight flex items-center gap-3">
+             <Store className="w-8 h-8 text-brand-primary" />
+             Plugin Marketplace
+           </h1>
+           <p className="text-brand-text-muted text-sm font-mono mt-1">EXTEND PLATFORM CAPABILITIES</p>
         </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="flex flex-col md:flex-row gap-4"
-      >
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-text-muted" />
-          <input
-            type="text"
-            placeholder="Search plugins..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-brand-surface border border-brand-border rounded-xl text-brand-text placeholder-brand-text-muted focus:outline-none focus:border-brand-primary"
-          />
+        
+        <div className="flex items-center gap-4 w-full lg:w-auto">
+          <div className="relative flex-1 lg:w-64">
+             <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-brand-text-muted" />
+             <input type="text" placeholder="Search plugins..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-brand-surface border border-brand-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-brand-text outline-none focus:border-brand-primary transition-all" />
+          </div>
+          <button className="bg-brand-elevated border border-brand-border hover:bg-brand-border/50 text-brand-text px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors whitespace-nowrap">
+             <Upload className="w-4 h-4" /> Submit Plugin
+          </button>
         </div>
-      </motion.div>
+      </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="flex gap-2 overflow-x-auto pb-2"
-      >
-        {categories.map((category, idx) => (
-          <motion.button
-            key={category}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 + idx * 0.03 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setSelectedCategory(category)}
-            className={cn(
-              'px-4 py-2 rounded-xl text-sm font-bold transition-colors whitespace-nowrap',
-              selectedCategory === category
-                ? 'bg-brand-primary text-white shadow-glow-primary'
-                : 'bg-brand-surface border border-brand-border text-brand-text hover:bg-brand-elevated'
-            )}
-          >
-            {category}
-          </motion.button>
-        ))}
-      </motion.div>
+      {/* Stats Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+         <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex items-center justify-between">
+            <div>
+              <div className="text-brand-text-muted text-xs font-mono uppercase tracking-wider mb-1">Total Plugins</div>
+              <div className="text-3xl font-bold text-brand-text">47</div>
+            </div>
+            <div className="w-12 h-12 rounded-full bg-brand-primary/10 flex items-center justify-center"><Store className="w-6 h-6 text-brand-primary"/></div>
+         </div>
+         <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex items-center justify-between">
+            <div>
+              <div className="text-brand-text-muted text-xs font-mono uppercase tracking-wider mb-1">Installed</div>
+              <div className="text-3xl font-bold text-brand-text">8</div>
+            </div>
+            <div className="w-12 h-12 rounded-full bg-brand-success/10 flex items-center justify-center"><CheckCircle className="w-6 h-6 text-brand-success"/></div>
+         </div>
+         <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex items-center justify-between">
+            <div>
+              <div className="text-brand-text-muted text-xs font-mono uppercase tracking-wider mb-1">Updates Available</div>
+              <div className="text-3xl font-bold text-brand-warning">3</div>
+            </div>
+            <div className="w-12 h-12 rounded-full bg-brand-warning/10 flex items-center justify-center"><RefreshCw className="w-6 h-6 text-brand-warning"/></div>
+         </div>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredPlugins.map((plugin, idx) => (
-          <motion.div
-            key={plugin.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 + idx * 0.05 }}
-            whileHover={{ y: -4, scale: 1.02 }}
-            className="bg-brand-surface border border-brand-border rounded-2xl p-6 hover:border-brand-primary/30 transition-all"
-          >
-            <motion.div
-              whileHover={{ rotate: 5 }}
-              className="w-16 h-16 rounded-xl bg-brand-primary/20 flex items-center justify-center mb-4"
-            >
-              <div className="w-8 h-8 rounded-lg bg-brand-primary" />
-            </motion.div>
-            <h3 className="text-sm font-bold text-brand-text mb-1">{plugin.name}</h3>
-            <p className="text-xs text-brand-text-muted font-mono mb-3">{plugin.author}</p>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase bg-brand-elevated text-brand-text-muted">
-                {plugin.category}
-              </span>
-              <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase bg-brand-elevated text-brand-text-muted">
-                {plugin.price}
-              </span>
-            </div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-1">
-                <Star className="w-4 h-4 text-brand-warning" />
-                <span className="text-sm text-brand-text font-bold">{plugin.rating}</span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-brand-text-muted font-mono">
-                <Download className="w-3 h-3" />
-                <span>{plugin.downloads}</span>
-              </div>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={cn(
-                'w-full px-4 py-2 rounded-xl text-sm font-bold transition-colors',
-                plugin.installed
-                  ? 'bg-brand-success/20 text-brand-success'
-                  : 'bg-brand-primary text-white hover:bg-brand-primary/90 shadow-glow-primary'
-              )}
-            >
-              {plugin.installed ? 'Installed' : 'Install'}
-            </motion.button>
-          </motion.div>
+      {/* Filter Tabs */}
+      <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+        {categories.map(cat => (
+          <button key={cat.name} onClick={() => setSelectedCategory(cat.name)} className={cn("px-4 py-2.5 rounded-xl whitespace-nowrap text-sm font-bold flex items-center gap-3 transition-all", selectedCategory === cat.name ? "bg-brand-primary text-white shadow-glow-primary" : "bg-brand-surface border border-brand-border text-brand-text-muted hover:text-brand-text hover:bg-brand-elevated")}>
+            {cat.name}
+            <span className={cn("px-2 py-0.5 rounded-md text-xs font-mono", selectedCategory === cat.name ? "bg-white/20 text-white" : "bg-brand-elevated text-brand-text-muted")}>{cat.count}</span>
+          </button>
         ))}
       </div>
+
+      {/* Plugin Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <AnimatePresence>
+          {filteredPlugins.map(plugin => (
+            <motion.div layout key={plugin.id} initial={{opacity:0, scale:0.95}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.9}} whileHover={{y:-4}} className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col transition-all hover:border-brand-primary/30 group">
+              <div className="flex justify-between items-start mb-5">
+                 <div className="w-14 h-14 rounded-xl bg-brand-elevated border border-brand-border text-brand-primary flex items-center justify-center font-bold text-xl group-hover:bg-brand-primary/10 transition-colors">
+                   {getInitials(plugin.name)}
+                 </div>
+                 {plugin.status === 'installed' && <span className="bg-brand-success/10 text-brand-success border border-brand-success/20 text-[10px] font-bold uppercase px-2.5 py-1 rounded-md flex items-center gap-1.5"><CheckCircle className="w-3 h-3"/> Installed</span>}
+                 {plugin.status === 'update_available' && <span className="bg-brand-warning/10 text-brand-warning border border-brand-warning/20 text-[10px] font-bold uppercase px-2.5 py-1 rounded-md flex items-center gap-1.5"><RefreshCw className="w-3 h-3"/> Update</span>}
+              </div>
+              <h3 className="text-base font-bold text-brand-text mb-1">{plugin.name}</h3>
+              <p className="text-xs text-brand-text-muted font-mono mb-4">by {plugin.author} • {plugin.version}</p>
+              <p className="text-sm text-brand-text-secondary mb-6 line-clamp-2 min-h-[40px]">{plugin.description}</p>
+              
+              <div className="flex items-center justify-between mb-6 pt-4 border-t border-brand-border/50">
+                <div className="flex items-center gap-4">
+                   <div className="flex items-center gap-1.5 text-brand-warning text-sm font-bold"><Star className="w-4 h-4 fill-current"/> {plugin.rating}</div>
+                   <div className="flex items-center gap-1.5 text-brand-text-muted text-xs font-mono"><Download className="w-4 h-4"/> {plugin.downloads}</div>
+                </div>
+                <div className="text-sm font-bold text-brand-text bg-brand-elevated px-3 py-1 rounded-md border border-brand-border">{plugin.price}</div>
+              </div>
+              
+              <div className="mt-auto flex gap-3">
+                 {plugin.status === 'installed' ? (
+                   <>
+                     <button className="flex-1 bg-brand-elevated hover:bg-brand-border/50 border border-brand-border text-brand-text font-bold text-sm py-2.5 rounded-xl transition-all">Configure</button>
+                     <button className="px-4 bg-brand-danger/10 hover:bg-brand-danger/20 text-brand-danger rounded-xl transition-all"><Trash2 className="w-4 h-4"/></button>
+                   </>
+                 ) : plugin.status === 'update_available' ? (
+                   <button className="w-full bg-brand-warning text-brand-bg font-bold text-sm py-2.5 rounded-xl hover:bg-brand-warning/90 shadow-glow-warning transition-all">Update to v{plugin.version.split('.')[0] + '.' + (parseInt(plugin.version.split('.')[1])+1) + '.0'}</button>
+                 ) : (
+                   <button className="w-full bg-brand-primary text-white font-bold text-sm py-2.5 rounded-xl hover:bg-brand-primary/90 shadow-glow-primary transition-all">Install Plugin</button>
+                 )}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+      
+      {filteredPlugins.length === 0 && (
+        <div className="py-20 text-center">
+          <Store className="w-16 h-16 text-brand-border mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-brand-text mb-2">No plugins found</h3>
+          <p className="text-brand-text-muted">Try adjusting your search or category filter.</p>
+        </div>
+      )}
+
     </motion.div>
   );
-}
-
-function cn(...classes: (string | undefined | null | false)[]) {
-  return classes.filter(Boolean).join(' ');
 }

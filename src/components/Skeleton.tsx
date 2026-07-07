@@ -10,7 +10,7 @@ interface SkeletonProps {
 export const Skeleton = ({ className }: SkeletonProps) => (
   <motion.div 
     className={cn('rounded-md bg-white/5', className)}
-    animate={{ opacity: [0.5, 1, 0.5 }}
+    animate={{ opacity: [0.5, 1, 0.5] }}
     transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
   />
 );
