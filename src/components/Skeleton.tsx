@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 
 interface SkeletonProps {
@@ -7,16 +8,25 @@ interface SkeletonProps {
 
 /** Single animated placeholder block */
 export const Skeleton = ({ className }: SkeletonProps) => (
-  <div className={cn('animate-pulse rounded-md bg-white/5', className)} />
+  <motion.div 
+    className={cn('rounded-md bg-white/5', className)}
+    animate={{ opacity: [0.5, 1, 0.5 }}
+    transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+  />
 );
 
 /** Mimics a stat card (title + big number + subtitle) */
 export const SkeletonCard = ({ className }: SkeletonProps) => (
-  <div className={cn('rounded-xl bg-brand-surface border border-brand-border p-5 space-y-3', className)}>
+  <motion.div 
+    className={cn('rounded-xl bg-brand-surface border border-brand-border p-5 space-y-3', className)}
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3 }}
+  >
     <Skeleton className="h-3 w-1/3" />
     <Skeleton className="h-8 w-1/2" />
     <Skeleton className="h-3 w-2/3" />
-  </div>
+  </motion.div>
 );
 
 /** Mimics a table with a header row and N data rows.
@@ -26,17 +36,24 @@ export const SkeletonTable = ({ rows = 5, className }: SkeletonProps & { rows?: 
   <div className={cn('space-y-2', className)}>
     <Skeleton className="h-8 w-full rounded-lg" />
     {Array.from({ length: rows }).map((_, i) => (
-      <div key={i}><Skeleton className="h-12 w-full rounded-lg" /></div>
+      <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3, delay: i * 0.05 }}>
+        <Skeleton className="h-12 w-full rounded-lg" />
+      </motion.div>
     ))}
   </div>
 );
 
 /** Mimics a chart panel */
 export const SkeletonChart = ({ className }: SkeletonProps) => (
-  <div className={cn('rounded-xl bg-brand-surface border border-brand-border p-5', className)}>
+  <motion.div 
+    className={cn('rounded-xl bg-brand-surface border border-brand-border p-5', className)}
+    initial={{ opacity: 0, scale: 0.98 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ duration: 0.3, delay: 0.1 }}
+  >
     <Skeleton className="h-3 w-1/4 mb-4" />
     <Skeleton className="h-48 w-full rounded-lg" />
-  </div>
+  </motion.div>
 );
 
 /** Full-page loading layout — stat cards + two charts + a table */
@@ -44,7 +61,9 @@ export const SkeletonPage = () => (
   <div className="p-6 space-y-6">
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i}><SkeletonCard /></div>
+        <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: i * 0.08 }}>
+          <SkeletonCard />
+        </motion.div>
       ))}
     </div>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

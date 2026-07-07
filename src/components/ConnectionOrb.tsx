@@ -194,21 +194,45 @@ export function ConnectionOrb({
     const cx = 14, cy = 14;
     return (
       <svg width="28" height="28" viewBox="0 0 28 28"
-        style={{ filter: `drop-shadow(0 0 5px ${cfg.glowColor})`, transition: 'filter 0.8s' }}>
+        style={{ filter: `drop-shadow(0 0 5px ${cfg.glowColor}) drop-shadow(0 0 2px ${cfg.glowColor})`, transition: 'filter 0.8s' }}>
+        {/* Outer glow halo */}
+        <motion.circle cx={cx} cy={cy} r="13"
+          fill="none" strokeWidth="0.5"
+          animate={{ stroke: cfg.color, opacity: [0.15, 0.3, 0.15], r: [12, 14, 12] }}
+          transition={{
+            opacity: { repeat: Infinity, duration: 2.5, ease: 'easeInOut' },
+            stroke: { duration: 0.8 },
+            r: { repeat: Infinity, duration: 3, ease: 'easeInOut' },
+          }}
+        />
         <Ring cx={cx} cy={cy} r={11} strokeW={1.5} dashFrac={0.72} gapFrac={0.28}
           color={cfg.color} duration={cfg.r1Duration} />
         <Ring cx={cx} cy={cy} r={7.5} strokeW={1.5} dashFrac={0.6} gapFrac={0.4}
           color={cfg.color} duration={cfg.r2Duration} opacity={0.7} />
         <Ring cx={cx} cy={cy} r={4} strokeW={1.5} dashFrac={0.85} gapFrac={0.15}
           color={cfg.color} duration={cfg.r3Duration} opacity={0.5} />
+        {/* Soft core */}
+        <motion.circle cx={cx} cy={cy} r="5"
+          animate={{ fill: cfg.color, opacity: [0.12, 0.2, 0.12] }}
+          transition={{
+            opacity: { repeat: Infinity, duration: 2, ease: 'easeInOut' },
+            fill: { duration: 0.8 },
+          }}
+        />
         {/* centre */}
         <motion.circle cx={cx} cy={cy} r="2.5"
-          animate={{ fill: cfg.color, scale: [1, 1.25, 1], opacity: [0.85, 1, 0.85] }}
+          animate={{ fill: cfg.color, scale: [1, 1.35, 1], opacity: [0.85, 1, 0.85] }}
           transition={{ scale: { repeat: Infinity, duration: 1.8, ease: 'easeInOut' },
                         opacity: { repeat: Infinity, duration: 1.8, ease: 'easeInOut' },
                         fill: { duration: 0.8 } }}
           style={{ transformOrigin: `${cx}px ${cy}px` }}
         />
+        {/* Orbiting dot for live state */}
+        {state === 'live' && (
+          <motion.g style={{ transformOrigin: `${cx}px ${cy}px` }} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 3, ease: 'linear' }}>
+            <motion.circle cx={cx + 9} cy={cy} r="1.5" fill={cfg.color} animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.7, ease: 'easeInOut' }} />
+          </motion.g>
+        )}
       </svg>
     );
   }
@@ -229,12 +253,22 @@ export function ConnectionOrb({
             filter: `drop-shadow(0 0 10px ${cfg.glowColor}) drop-shadow(0 0 3px ${cfg.glowColor})`,
             transition: 'filter 0.9s ease',
           }}>
-          {/* Outer glow halo */}
+          {/* Outer glow halo 1 */}
           <motion.circle cx={cx} cy={cy} r="42"
             fill="none" strokeWidth="1"
-            animate={{ stroke: cfg.color, opacity: [0.12, 0.25, 0.12] }}
+            animate={{ stroke: cfg.color, opacity: [0.12, 0.25, 0.12], r: [40, 44, 40] }}
             transition={{
               opacity: { repeat: Infinity, duration: 3, ease: 'easeInOut' },
+              stroke: { duration: 0.8 },
+              r: { repeat: Infinity, duration: 4, ease: 'easeInOut' },
+            }}
+          />
+          {/* Outer glow halo 2 */}
+          <motion.circle cx={cx} cy={cy} r="38"
+            fill="none" strokeWidth="0.5"
+            animate={{ stroke: cfg.color, opacity: [0.08, 0.15, 0.08] }}
+            transition={{
+              opacity: { repeat: Infinity, duration: 2, ease: 'easeInOut', delay: 0.5 },
               stroke: { duration: 0.8 },
             }}
           />
@@ -246,7 +280,7 @@ export function ConnectionOrb({
           <Ring cx={cx} cy={cy} r={16} strokeW={2}     dashFrac={0.85} gapFrac={0.15}
             color={cfg.color} duration={cfg.r3Duration} opacity={0.5} />
 
-          {/* Soft fill core */}
+          {/* Soft fill core 1 */}
           <motion.circle cx={cx} cy={cy} r="10"
             animate={{ fill: cfg.color, opacity: [0.08, 0.18, 0.08] }}
             transition={{
@@ -254,9 +288,17 @@ export function ConnectionOrb({
               fill: { duration: 0.8 },
             }}
           />
+          {/* Soft fill core 2 */}
+          <motion.circle cx={cx} cy={cy} r="14"
+            animate={{ fill: cfg.color, opacity: [0.04, 0.09, 0.04] }}
+            transition={{
+              opacity: { repeat: Infinity, duration: 3.2, ease: 'easeInOut', delay: 0.3 },
+              fill: { duration: 0.8 },
+            }}
+          />
           {/* Solid centre dot */}
           <motion.circle cx={cx} cy={cy} r="5"
-            animate={{ fill: cfg.color, scale: [1, 1.3, 1], opacity: [0.85, 1, 0.85] }}
+            animate={{ fill: cfg.color, scale: [1, 1.4, 1], opacity: [0.85, 1, 0.85] }}
             style={{ transformOrigin: `${cx}px ${cy}px` }}
             transition={{
               scale:   { repeat: Infinity, duration: cfg.pulseDuration, ease: 'easeInOut' },
@@ -264,6 +306,22 @@ export function ConnectionOrb({
               fill:    { duration: 0.8 },
             }}
           />
+          {/* Small rotating orbit dot */}
+          {state === 'live' && (
+            <motion.g style={{ transformOrigin: `${cx}px ${cy}px` }} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}>
+              <motion.circle cx={cx + 30} cy={cy} r="2.5" fill={cfg.color} animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.8, ease: 'easeInOut' }} />
+            </motion.g>
+          )}
+          {state === 'connecting' && (
+            <>
+              <motion.g style={{ transformOrigin: `${cx}px ${cy}px` }} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2.5, ease: 'linear' }}>
+                <motion.circle cx={cx + 30} cy={cy} r="2.5" fill={cfg.color} animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.6, ease: 'easeInOut' }} />
+              </motion.g>
+              <motion.g style={{ transformOrigin: `${cx}px ${cy}px` }} animate={{ rotate: -360 }} transition={{ repeat: Infinity, duration: 3.5, ease: 'linear' }}>
+                <motion.circle cx={cx - 25} cy={cy} r="2" fill={cfg.color} animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 0.7, ease: 'easeInOut', delay: 0.2 }} />
+              </motion.g>
+            </>
+          )}
         </svg>
 
         {/* Ping badge top-right */}

@@ -19,6 +19,20 @@ import {
   GitBranch,
   BarChart3,
   Keyboard,
+  Database,
+  BookOpen,
+  Link,
+  Puzzle,
+  MessageSquare,
+  Calendar,
+  CheckSquare,
+  Key,
+  Users,
+  FileClock,
+  Store,
+  Building2,
+  Cpu,
+  MessageCircle,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import CommandTerminal from './CommandTerminal';
@@ -94,15 +108,26 @@ export default function Layout() {
   }, [socketConnected, restEndpoint, masterToken, pushLatency]);
 
   const navItems = [
-    { to: '/',          icon: LayoutDashboard, label: 'Command Center' },
-    { to: '/posts',     icon: FileText,        label: 'Content Studio' },
-    { to: '/workflows', icon: GitBranch,       label: 'Workflows'      },
-    { to: '/engine',    icon: BrainCircuit,    label: 'AI Matrix'      },
-    { to: '/payloads',  icon: Network,         label: 'Payload Logs'   },
-    { to: '/api',       icon: Activity,        label: 'API Analytics'  },
-    { to: '/prometheus',icon: BarChart3,       label: 'Prometheus'     },
-    { to: '/guardian',  icon: ShieldAlert,     label: 'Guardian'       },
-    { to: '/settings',  icon: Settings,        label: 'Settings'       },
+    { to: '/',                  icon: LayoutDashboard,  label: 'Dashboard' },
+    { to: '/ai-brain',          icon: BrainCircuit,     label: 'AI Brain' },
+    { to: '/workflows',         icon: GitBranch,        label: 'Automation' },
+    { to: '/posts',             icon: FileText,         label: 'Content Studio' },
+    { to: '/knowledge-base',    icon: BookOpen,         label: 'Knowledge Base' },
+    { to: '/integrations',      icon: Link,             label: 'Integrations' },
+    { to: '/mis',               icon: Database,         label: 'MIS Manager' },
+    { to: '/messenger',         icon: MessageSquare,    label: 'Messenger' },
+    { to: '/analytics',         icon: BarChart3,        label: 'Analytics' },
+    { to: '/scheduler',         icon: Calendar,         label: 'Scheduler' },
+    { to: '/tasks',             icon: CheckSquare,      label: 'Tasks' },
+    { to: '/api-manager',       icon: Key,              label: 'API Manager' },
+    { to: '/security',          icon: ShieldAlert,      label: 'Security' },
+    { to: '/users',             icon: Users,            label: 'Users' },
+    { to: '/audit-logs',        icon: FileClock,        label: 'Audit Logs' },
+    { to: '/marketplace',       icon: Store,            label: 'Marketplace' },
+    { to: '/tenants',           icon: Building2,        label: 'Tenants' },
+    { to: '/monitoring',        icon: Cpu,              label: 'Monitoring' },
+    { to: '/ai-chat',           icon: MessageCircle,    label: 'AI Chat' },
+    { to: '/settings',          icon: Settings,         label: 'Settings' },
   ];
 
   const handleLogout = async () => {

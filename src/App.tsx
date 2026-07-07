@@ -9,15 +9,31 @@ import { SkeletonPage } from './components/Skeleton';
 
 // Route-level code splitting — each page is its own chunk loaded on demand.
 // This cuts initial bundle size significantly and gives Suspense a natural boundary.
-const Dashboard       = lazy(() => import('./pages/Dashboard'));
-const Posts           = lazy(() => import('./pages/Posts'));
-const ApiAnalytics    = lazy(() => import('./pages/ApiAnalytics'));
-const Guardian        = lazy(() => import('./pages/Guardian'));
-const Settings        = lazy(() => import('./pages/Settings'));
-const AIEngine        = lazy(() => import('./pages/AIEngine'));
-const PayloadInspector = lazy(() => import('./pages/PayloadInspector'));
-const Workflows       = lazy(() => import('./pages/Workflows'));
+const Dashboard         = lazy(() => import('./pages/Dashboard'));
+const Posts             = lazy(() => import('./pages/Posts'));
+const ApiAnalytics      = lazy(() => import('./pages/ApiAnalytics'));
+const Guardian          = lazy(() => import('./pages/Guardian'));
+const Settings          = lazy(() => import('./pages/Settings'));
+const AIEngine          = lazy(() => import('./pages/AIEngine'));
+const PayloadInspector  = lazy(() => import('./pages/PayloadInspector'));
+const Workflows         = lazy(() => import('./pages/Workflows'));
 const PrometheusMetrics = lazy(() => import('./pages/PrometheusMetrics'));
+const AIBrain           = lazy(() => import('./pages/AIBrain'));
+const KnowledgeBase     = lazy(() => import('./pages/KnowledgeBase'));
+const Integrations      = lazy(() => import('./pages/Integrations'));
+const MISManager        = lazy(() => import('./pages/MISManager'));
+const Messenger         = lazy(() => import('./pages/Messenger'));
+const Analytics         = lazy(() => import('./pages/Analytics'));
+const Scheduler         = lazy(() => import('./pages/Scheduler'));
+const Tasks             = lazy(() => import('./pages/Tasks'));
+const APIManager        = lazy(() => import('./pages/APIManager'));
+const Security          = lazy(() => import('./pages/Security'));
+const Users             = lazy(() => import('./pages/Users'));
+const AuditLogs         = lazy(() => import('./pages/AuditLogs'));
+const Marketplace       = lazy(() => import('./pages/Marketplace'));
+const Tenants           = lazy(() => import('./pages/Tenants'));
+const Monitoring        = lazy(() => import('./pages/Monitoring'));
+const AIChat            = lazy(() => import('./pages/AIChat'));
 
 /**
  * Wraps each route in an ErrorBoundary + Suspense so that:
@@ -61,8 +77,24 @@ export default function App() {
         ) : (
           <Route path="/" element={<Layout />}>
             <Route index            element={<Page name="Dashboard">        <Dashboard />        </Page>} />
-            <Route path="posts"     element={<Page name="Posts">            <Posts />            </Page>} />
+            <Route path="ai-brain"  element={<Page name="AI Brain">         <AIBrain />          </Page>} />
             <Route path="workflows" element={<Page name="Workflows">        <Workflows />        </Page>} />
+            <Route path="posts"     element={<Page name="Posts">            <Posts />            </Page>} />
+            <Route path="knowledge-base" element={<Page name="Knowledge Base"><KnowledgeBase />    </Page>} />
+            <Route path="integrations" element={<Page name="Integrations"><Integrations />        </Page>} />
+            <Route path="mis"       element={<Page name="MIS Manager">     <MISManager />        </Page>} />
+            <Route path="messenger" element={<Page name="Messenger">       <Messenger />        </Page>} />
+            <Route path="analytics" element={<Page name="Analytics">       <Analytics />        </Page>} />
+            <Route path="scheduler" element={<Page name="Scheduler">       <Scheduler />        </Page>} />
+            <Route path="tasks"     element={<Page name="Tasks">           <Tasks />            </Page>} />
+            <Route path="api-manager" element={<Page name="API Manager"> <APIManager />        </Page>} />
+            <Route path="security"  element={<Page name="Security">        <Security />         </Page>} />
+            <Route path="users"     element={<Page name="Users">           <Users />            </Page>} />
+            <Route path="audit-logs" element={<Page name="Audit Logs">    <AuditLogs />        </Page>} />
+            <Route path="marketplace" element={<Page name="Marketplace"> <Marketplace />        </Page>} />
+            <Route path="tenants"   element={<Page name="Tenants">         <Tenants />          </Page>} />
+            <Route path="monitoring" element={<Page name="Monitoring">    <Monitoring />        </Page>} />
+            <Route path="ai-chat"   element={<Page name="AI Chat">         <AIChat />          </Page>} />
             <Route path="engine"    element={<Page name="AI Engine">        <AIEngine />         </Page>} />
             <Route path="payloads"  element={<Page name="Payload Inspector"><PayloadInspector /> </Page>} />
             <Route path="api"       element={<Page name="API Analytics">    <ApiAnalytics />     </Page>} />
