@@ -1,0 +1,80 @@
+M
+My Workspace
+
+
+k
+My project
+
+Production
+
+Kanyoza-systems-Bot
+
+My project
+Production
+Kanyoza-systems-Bot
+
+Application logs
+Search
+Search logs
+
+Last hour
+
+
+
+
+New logs in Live Tail
+
+{"ts": "2026-07-04T21:35:25.665047+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "e496f6cf-d733-4d49-a0c2-66fe63453968", "msg": "[gemini] HTTP 429 \u2014 rate limited (Retry-After: 60s)", "levelno": 30}
+127.0.0.1 - - [04/Jul/2026:21:35:25 +0000] "HEAD / HTTP/1.1" 200 0 "https://kanyoza-systems-bot.onrender.com" "Mozilla/5.0+(compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)"
+127.0.0.1 - - [04/Jul/2026:21:35:26 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 238 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:35:29 +0000] "GET /api/v1/status HTTP/1.1" 200 353 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:36:50 +0000] "GET /api/v1/metrics/resources HTTP/1.1" 404 54 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:36:50 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:36:51 +0000] "GET /api/v1/status HTTP/1.1" 200 353 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:36:51 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 191 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:36:52 +0000] "GET /api/v1/metrics/resources HTTP/1.1" 404 54 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:36:55 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+{"ts": "2026-07-04T21:36:55.399983+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "c2c73a63-75e0-404d-8524-9f092be1b1cf", "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (114 ms)", "levelno": 30}
+{"ts": "2026-07-04T21:36:55.400098+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "c2c73a63-75e0-404d-8524-9f092be1b1cf", "msg": "[gemini] HTTP 429 \u2014 rate limited (Retry-After: 60s)", "levelno": 30}
+127.0.0.1 - - [04/Jul/2026:21:36:55 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 238 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:37:06 +0000] "GET /api/v1/status HTTP/1.1" 200 353 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:37:25 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+{"ts": "2026-07-04T21:37:25.391502+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "0e49fec0-858b-4b7b-aefb-11895ef13280", "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (117 ms)", "levelno": 30}
+{"ts": "2026-07-04T21:37:25.391636+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "0e49fec0-858b-4b7b-aefb-11895ef13280", "msg": "[gemini] HTTP 429 \u2014 rate limited (Retry-After: 60s)", "levelno": 30}
+127.0.0.1 - - [04/Jul/2026:21:37:25 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 238 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:37:55 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+{"ts": "2026-07-04T21:37:55.904991+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "b91468dd-06b6-4325-860e-0827d867d2eb", "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (115 ms)", "levelno": 30}
+{"ts": "2026-07-04T21:37:55.905100+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "b91468dd-06b6-4325-860e-0827d867d2eb", "msg": "[gemini] HTTP 429 \u2014 rate limited (Retry-After: 60s)", "levelno": 30}
+127.0.0.1 - - [04/Jul/2026:21:37:56 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 238 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:38:18 +0000] "GET /api/v1/status HTTP/1.1" 200 353 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:38:25 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:38:26 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 191 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:39:25 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+{"ts": "2026-07-04T21:39:25.793801+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "48e75347-944e-4a63-9eb4-bb09ede80f8c", "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (121 ms)", "levelno": 30}
+{"ts": "2026-07-04T21:39:25.793914+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "48e75347-944e-4a63-9eb4-bb09ede80f8c", "msg": "[gemini] HTTP 429 \u2014 rate limited (Retry-After: 60s)", "levelno": 30}
+127.0.0.1 - - [04/Jul/2026:21:39:26 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 238 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:40:29 +0000] "HEAD / HTTP/1.1" 200 0 "https://kanyoza-systems-bot.onrender.com" "Mozilla/5.0+(compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)"
+127.0.0.1 - - [04/Jul/2026:21:41:10 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+{"ts": "2026-07-04T21:41:10.742800+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "387674d7-6cf0-448e-954f-741c2197ec0f", "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (120 ms)", "levelno": 30}
+{"ts": "2026-07-04T21:41:10.742921+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "387674d7-6cf0-448e-954f-741c2197ec0f", "msg": "[gemini] HTTP 429 \u2014 rate limited (Retry-After: 60s)", "levelno": 30}
+127.0.0.1 - - [04/Jul/2026:21:41:11 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 238 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:41:25 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+{"ts": "2026-07-04T21:41:25.406453+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "1d01132e-c0b2-4a88-aa55-9d0a9187a763", "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (117 ms)", "levelno": 30}
+{"ts": "2026-07-04T21:41:25.406590+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "1d01132e-c0b2-4a88-aa55-9d0a9187a763", "msg": "[gemini] HTTP 429 \u2014 rate limited (Retry-After: 60s)", "levelno": 30}
+127.0.0.1 - - [04/Jul/2026:21:41:25 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 238 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:42:25 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+{"ts": "2026-07-04T21:42:25.560680+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "b66d6ffb-53cb-491a-bff1-2f51606a5634", "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (116 ms)", "levelno": 30}
+{"ts": "2026-07-04T21:42:25.560793+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "b66d6ffb-53cb-491a-bff1-2f51606a5634", "msg": "[gemini] HTTP 429 \u2014 rate limited (Retry-After: 60s)", "levelno": 30}
+127.0.0.1 - - [04/Jul/2026:21:42:26 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 239 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:42:55 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+{"ts": "2026-07-04T21:42:55.722323+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "f9a2e8f7-01aa-4ac1-a4de-4a1e4ba5296e", "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (129 ms)", "levelno": 30}
+{"ts": "2026-07-04T21:42:55.722430+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "f9a2e8f7-01aa-4ac1-a4de-4a1e4ba5296e", "msg": "[gemini] HTTP 429 \u2014 rate limited (Retry-After: 60s)", "levelno": 30}
+127.0.0.1 - - [04/Jul/2026:21:42:56 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 238 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+{"ts": "2026-07-04T21:44:02.659942+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "5729de56-180a-47a8-bf09-c4d234cb8b05", "msg": "[gemini] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.Ab8RN6JXzBeG-VMEAYK7UZhJGDUZYxqw2FUZaWBdw5iml_7x3Q \u2192 429 (112 ms)", "levelno": 30}
+{"ts": "2026-07-04T21:44:02.660073+00:00", "level": "WARNING", "module": "kanyoza.utils.http_client", "correlation_id": "5729de56-180a-47a8-bf09-c4d234cb8b05", "msg": "[gemini] HTTP 429 \u2014 rate limited (Retry-After: 60s)", "levelno": 30}
+127.0.0.1 - - [04/Jul/2026:21:44:03 +0000] "GET /api/v1/health/deep HTTP/1.1" 200 238 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+127.0.0.1 - - [04/Jul/2026:21:44:03 +0000] "GET /api/v1/dashboard/live HTTP/1.1" 200 174 "https://prometheusk.pages.dev/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+0 services selected:
+
+Move
+

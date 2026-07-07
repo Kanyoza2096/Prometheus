@@ -1,0 +1,78 @@
+import React, { lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useStore } from './store/useStore';
+import { supabase } from './lib/supabase';
+import Login from './pages/Login';
+import Layout from './components/Layout';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { SkeletonPage } from './components/Skeleton';
+
+// Route-level code splitting — each page is its own chunk loaded on demand.
+// This cuts initial bundle size significantly and gives Suspense a natural boundary.
+const Dashboard       = lazy(() => import('./pages/Dashboard'));
+const Posts           = lazy(() => import('./pages/Posts'));
+const ApiAnalytics    = lazy(() => import('./pages/ApiAnalytics'));
+const Guardian        = lazy(() => import('./pages/Guardian'));
+const Settings        = lazy(() => import('./pages/Settings'));
+const AIEngine        = lazy(() => import('./pages/AIEngine'));
+const PayloadInspector = lazy(() => import('./pages/PayloadInspector'));
+const Workflows       = lazy(() => import('./pages/Workflows'));
+const PrometheusMetrics = lazy(() => import('./pages/PrometheusMetrics'));
+
+/**
+ * Wraps each route in an ErrorBoundary + Suspense so that:
+ *  - A crash in one page never takes down the whole shell
+ *  - Skeleton placeholders show during lazy-load / data fetch
+ */
+function Page({ name, children }: { name: string; children: ReactNode }) {
+  return (
+    <ErrorBoundary name={name}>
+      <Suspense fallback={<SkeletonPage />}>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+export default function App() {
+  const isAuthenticated = useStore(state => state.isAuthenticated);
+  const login  = useStore(state => state.login);
+  const logout = useStore(state => state.logout);
+
+  useEffect(() => {
+    // Restore session on load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) login();
+    });
+
+    // Keep auth state in sync with Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) { login(); } else { logout(); }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [login, logout]);
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        {!isAuthenticated ? (
+          <Route path="*" element={<Login />} />
+        ) : (
+          <Route path="/" element={<Layout />}>
+            <Route index            element={<Page name="Dashboard">        <Dashboard />        </Page>} />
+            <Route path="posts"     element={<Page name="Posts">            <Posts />            </Page>} />
+            <Route path="workflows" element={<Page name="Workflows">        <Workflows />        </Page>} />
+            <Route path="engine"    element={<Page name="AI Engine">        <AIEngine />         </Page>} />
+            <Route path="payloads"  element={<Page name="Payload Inspector"><PayloadInspector /> </Page>} />
+            <Route path="api"       element={<Page name="API Analytics">    <ApiAnalytics />     </Page>} />
+            <Route path="prometheus"element={<Page name="Prometheus">       <PrometheusMetrics /></Page>} />
+            <Route path="guardian"  element={<Page name="Guardian">         <Guardian />         </Page>} />
+            <Route path="settings"  element={<Page name="Settings">         <Settings />         </Page>} />
+            <Route path="*"         element={<Navigate to="/" replace />} />
+          </Route>
+        )}
+      </Routes>
+    </BrowserRouter>
+  );
+}
