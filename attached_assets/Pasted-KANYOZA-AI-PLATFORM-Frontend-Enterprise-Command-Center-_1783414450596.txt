@@ -1,0 +1,433 @@
+KANYOZA AI PLATFORM Frontend (Enterprise Command Center)
+You are a senior Frontend Software Architect and UX Engineer.
+Your task is to review the entire frontend of KANYOZA AI PLATFORM and make sure the application is matching exactly this idea the enterprise-grade AI Operating System.
+This is NOT just a dashboard.
+It must become the central control application for the entire backend platform.
+Think of it as combining the best ideas from:
+Microsoft Azure Portal
+Google Cloud Console
+HubSpot
+Notion
+n8n
+Zapier
+Grafana
+GitHub
+Meta Business Suite
+while keeping the UI clean, modern, fast and mobile responsive.
+Goal
+The frontend must become the primary control center where the administrator can manage everything inside the AI Platform.
+The frontend should feel like:
+"Windows Control Panel for Artificial Intelligence."
+Technology
+Use
+React 19
+TypeScript
+Vite
+TailwindCSS
+React Router
+TanStack Query
+Zustand
+Framer Motion
+Recharts
+React Hook Form
+Zod
+Hero Icons
+Lucide Icons
+The application must be a Progressive Web App.
+Offline capable.
+Responsive.
+Dark/Light mode.
+Overall Layout
+Use professional enterprise layout.
+
+──────────────────────────────────────────────
+
+Top Navigation
+
+──────────────────────────────────────────────
+
+Logo
+
+Search
+
+Notifications
+
+System Status
+
+AI Health
+
+Current Tenant
+
+User Menu
+
+──────────────────────────────────────────────
+
+Left Sidebar
+
+──────────────────────────────────────────────
+
+Dashboard
+
+AI Brain
+
+Automation
+
+Content Studio
+
+Knowledge Base
+
+Integrations
+
+MIS Plugins
+
+Messenger
+
+Analytics
+
+Scheduler
+
+Tasks
+
+API Manager
+
+Security
+
+Users
+
+Audit Logs
+
+Marketplace
+
+Settings
+
+──────────────────────────────────────────────
+
+Main Workspace
+
+──────────────────────────────────────────────
+
+Dynamic pages
+
+──────────────────────────────────────────────
+Everything should load instantly.
+Dashboard
+The dashboard should look similar to Azure Portal.
+Show:
+Platform Health
+AI Status
+Memory Usage
+CPU
+API Calls
+Gemini Usage
+Supabase
+Plugin Status
+Facebook Pages Connected
+WhatsApp Accounts
+School Systems
+Church Systems
+CRM Systems
+ERP Systems
+Current Tasks
+Background Workers
+Queue Size
+Errors
+Warnings
+Daily Posts
+Monthly Posts
+AI Conversations
+Revenue
+Connected Tenants
+AI Brain Page
+This should become the heart of the application.
+Display:
+Current AI Model
+Conversation Memory
+Prompt Templates
+Knowledge Sources
+RAG Documents
+Reasoning Engine
+Planning Engine
+Content Engine
+Decision Engine
+Learning Engine
+Tool Calling
+Plugin Registry
+Model Router
+Allow changing models live.
+Show token usage.
+Show latency.
+Show cost estimation.
+Automation Center
+Visual automation builder.
+Like n8n.
+Like Zapier.
+Drag-and-drop nodes.
+Examples
+
+Facebook Message
+
+↓
+
+AI Reply
+
+↓
+
+Supabase
+
+↓
+
+Send Email
+
+↓
+
+Notify Admin
+Allow users to build workflows visually.
+Plugin Marketplace
+The backend already supports plugins.
+Create a marketplace.
+Categories
+Education
+Healthcare
+Business
+Government
+Finance
+Social Media
+CRM
+ERP
+Inventory
+Church
+Schools
+Each plugin should show
+Version
+Status
+Health
+Install
+Update
+Configure
+Remove
+MIS Manager
+This is extremely important.
+The platform must manage multiple management systems.
+For example
+
+School MIS
+
+Church MIS
+
+Hospital MIS
+
+CRM
+
+ERP
+
+Inventory
+
+Hotel
+
+Bank
+Each MIS should have
+Dashboard
+Users
+Permissions
+Database
+Reports
+Automation
+AI Assistant
+Messaging
+Notifications
+Analytics
+Settings
+Integration Center
+Display all integrations.
+Facebook
+WhatsApp
+Telegram
+Instagram
+LinkedIn
+Twitter
+Discord
+Slack
+Email
+Supabase
+Postgres
+Redis
+Google Drive
+Google Calendar
+Google Docs
+GitHub
+Webhooks
+REST APIs
+Each integration should display
+Status
+Latency
+Connected
+Reconnect
+Logs
+Configuration
+Health
+AI Content Studio
+Professional content management.
+Calendar
+Drafts
+Published
+Scheduled
+Rejected
+Templates
+Prompt Library
+Brand Assets
+Media Library
+Card Preview
+Video Preview
+Hashtags
+SEO
+Approval Workflow
+Allow editing before publishing.
+Analytics
+Beautiful charts.
+Daily
+Weekly
+Monthly
+Yearly
+Show
+Engagement
+Reach
+Followers
+Growth
+Best Posts
+Worst Posts
+Best Posting Time
+AI Accuracy
+Cost
+Tokens
+Requests
+Errors
+Performance
+Command Center
+Like terminal.
+Allow administrator to execute commands.
+Examples
+
+publish now
+
+scan repositories
+
+restart workers
+
+flush cache
+
+rebuild embeddings
+
+sync facebook
+
+backup database
+
+run automation
+
+health check
+Should display live logs.
+AI Chat Console
+Administrator can directly chat with the AI Core.
+Example
+
+Why did posting fail?
+
+Analyze today's errors.
+
+Optimize scheduler.
+
+Generate workflow.
+
+Create plugin.
+
+Scan security.
+The AI should understand platform context.
+Security Center
+Display
+API Keys
+JWT
+Sessions
+Rate Limits
+Failed Logins
+Permissions
+Audit Logs
+Threat Detection
+Security Score
+Multi Tenant Manager
+Allow multiple organizations.
+Each tenant should have
+Logo
+Theme
+Users
+Roles
+Billing
+Integrations
+Knowledge Base
+Plugins
+Content
+Automation
+Analytics
+Each tenant must be isolated.
+Monitoring
+Real-time.
+No page refresh.
+WebSocket.
+Display
+CPU
+Memory
+Queue
+Workers
+Database
+Redis
+Supabase
+Facebook
+Gemini
+Plugins
+Tasks
+Events
+Notification Center
+Show
+AI Alerts
+Publishing Errors
+Plugin Errors
+Security Alerts
+Messages
+Updates
+System Notifications
+Mobile Experience
+The frontend must work perfectly on phones.
+Bottom Navigation
+Swipe Gestures
+Push Notifications
+Responsive Layout
+Offline Support
+User Experience
+Everything should feel premium.
+Smooth animations.
+Professional spacing.
+Consistent typography.
+Rounded cards.
+Modern shadows.
+No clutter.
+No unnecessary colors.
+Fast loading.
+Skeleton loaders.
+Lazy loading.
+Error boundaries.
+Empty states.
+Accessibility.
+Code Quality
+Must use
+Component architecture
+Feature-based folders
+Reusable components
+Reusable hooks
+Strict TypeScript
+API abstraction
+Testing ready
+Scalable architecture
+No duplicated code
+No hardcoded values
+Expected Result
+The final application should feel like an enterprise AI operating system rather than a simple dashboard.
+An administrator should be able to manage an entire ecosystem—including AI services, MIS platforms, plugins, automation workflows, content publishing, integrations, analytics, and infrastructure—from a single interface.
+The frontend should be clean enough for a first-time user to navigate easily, yet powerful enough to support enterprise-scale operations with multiple organizations, multiple AI agents, and dozens of connected systems. It should be designed to remain maintainable and extensible as the platform grows over the coming years.
