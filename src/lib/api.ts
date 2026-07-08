@@ -231,3 +231,132 @@ export interface PromQLResult {
 }
 export const executePromQL = (cfg: ApiConfig, query: string) =>
   request<PromQLResult>(cfg, `/metrics/query?q=${encodeURIComponent(query)}`);
+// ── Redis ─────────────────────────────────────────────────────────────────────
+
+export interface RedisHealthEntry {
+  redis: 'healthy' | 'degraded' | 'disabled' | 'unhealthy';
+  latency_ms?: number;
+  url?: string;
+  fallback_active?: boolean;
+  error?: string;
+}
+export const fetchRedisHealth = (cfg: ApiConfig) =>
+  request<RedisHealthEntry>(cfg, '/health/deep').then(d => {
+    const services = (d as any).services;
+    return services?.redis || { redis: 'disabled' };
+  });
+
+// ── Log Stream (SSE) ──────────────────────────────────────────────────────────
+
+export interface LogEntry {
+  timestamp: string;
+  level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
+  module: string;
+  message: string;
+  correlation_id?: string;
+  epoch_ms: number;
+  lineno?: number;
+  func_name?: string;
+}
+
+/**
+ * Connect to the live log stream via Server-Sent Events.
+ * Returns an EventSource that the caller must close when done.
+ */
+export function connectLogStream(
+  cfg: ApiConfig,
+  onMessage: (entry: LogEntry) => void,
+  onError?: (err: Event) => void,
+  filter?: { level?: string; module?: string }
+): EventSource {
+  const base = cfg.restEndpoint.replace(/\/+$/, '');
+  const params = new URLSearchParams();
+  if (filter?.level) params.append('level', filter.level);
+  if (filter?.module) params.append('module', filter.module);
+  
+  const url = `${base}/logs/stream?${params}`;
+  const es = new EventSource(url);
+
+  es.onmessage = (event) => {
+    try {
+      const entry = JSON.parse(event.data) as LogEntry;
+      onMessage(entry);
+    } catch {}
+  };
+
+  es.onerror = (err) => {
+    onError?.(err);
+  };
+
+  return es;
+}
+
+// ── Logs (REST fallback) ──────────────────────────────────────────────────────
+
+export interface LogsPayload {
+  ok: boolean;
+  logs: LogEntry[];
+  count: number;
+  filters: { level?: string; module?: string; search?: string };
+}
+
+export const fetchRecentLogs = (
+  cfg: ApiConfig,
+  options?: { limit?: number; level?: string; module?: string; search?: string }
+) => {
+  const params = new URLSearchParams();
+  if (options?.limit) params.append('limit', String(options.limit));
+  if (options?.level) params.append('level', options.level);
+  if (options?.module) params.append('module', options.module);
+  if (options?.search) params.append('search', options.search);
+  return request<LogsPayload>(cfg, `/logs/recent?${params}`);
+};
+
+export interface LogStatsPayload {
+  ok: boolean;
+  total_logs: number;
+  errors: number;
+  warnings: number;
+  info: number;
+  debug: number;
+  uptime_seconds: number;
+  first_log?: string;
+  last_log?: string;
+}
+
+export const fetchLogStats = (cfg: ApiConfig) =>
+  request<LogStatsPayload>(cfg, '/logs/stats');
+
+export const clearLogs = (cfg: ApiConfig) =>
+  request<{ ok: boolean; message: string }>(cfg, '/logs/clear', { method: 'DELETE' });
+
+// ── System Connectors ─────────────────────────────────────────────────────────
+
+export interface ConnectorInfo {
+  supported_connectors: string[];
+  count: number;
+}
+
+export const fetchSystemConnectors = (cfg: ApiConfig) =>
+  request<ConnectorInfo>(cfg, '/system/connectors');
+
+// ── Integrations ──────────────────────────────────────────────────────────────
+
+export interface IntegrationEntry {
+  id: string;
+  name: string;
+  category: string;
+  connected: boolean;
+  status: 'active' | 'disconnected';
+  description: string;
+}
+
+export interface IntegrationsPayload {
+  ok: boolean;
+  integrations: IntegrationEntry[];
+  count: number;
+  connected: number;
+}
+
+export const fetchIntegrations = (cfg: ApiConfig) =>
+  request<IntegrationsPayload>(cfg, '/integrations');
