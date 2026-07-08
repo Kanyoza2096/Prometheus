@@ -146,15 +146,7 @@ interface AppState {
   stopRealtimeSubscriptions: () => void;
 }
 
-const INITIAL_HEALTH: SystemHealth[] = [
-  { id: 'gemini', name: 'Gemini AI', status: 'online', latency: 45, lastChecked: Date.now(), uptime: 99.99 },
-  { id: 'fb', name: 'Facebook API', status: 'online', latency: 120, lastChecked: Date.now(), uptime: 99.95 },
-  { id: 'supa', name: 'Supabase', status: 'online', latency: 15, lastChecked: Date.now(), uptime: 100 },
-  { id: 'redis', name: 'Upstash Redis', status: 'online', latency: 8, lastChecked: Date.now(), uptime: 99.9 },
-  { id: 'mwk', name: 'MWK Converter', status: 'degraded', latency: 850, lastChecked: Date.now(), uptime: 98.5 },
-  { id: 'play', name: 'Playwright', status: 'online', latency: 320, lastChecked: Date.now(), uptime: 99.1 },
-  { id: 'guard', name: 'Code Guardian', status: 'online', latency: 85, lastChecked: Date.now(), uptime: 100 },
-];
+const INITIAL_HEALTH: SystemHealth[] = [];
 
 export const useStore = create<AppState>((set, get) => ({
   isAuthenticated: false,
@@ -182,7 +174,6 @@ export const useStore = create<AppState>((set, get) => ({
   restEndpoint: localStorage.getItem('rest_endpoint') || import.meta.env.VITE_REST_ENDPOINT || 'https://kanyoza-systems-bot.onrender.com/api/v1',
   masterToken: localStorage.getItem('master_token') || import.meta.env.VITE_MASTER_TOKEN || '',
   setConnectionParams: (params) => {
-    // Capture the previous endpoint BEFORE updating state so the comparison is valid
     const previousWsEndpoint = get().wsEndpoint;
 
     if (params.wsEndpoint !== undefined) localStorage.setItem('ws_endpoint', params.wsEndpoint);
@@ -191,7 +182,6 @@ export const useStore = create<AppState>((set, get) => ({
 
     set((state) => ({ ...state, ...params }));
 
-    // Reconnect socket only when the WebSocket URL actually changed
     if (params.wsEndpoint && params.wsEndpoint !== previousWsEndpoint) {
       get().disconnectSocket();
       get().connectSocket();
@@ -235,18 +225,6 @@ export const useStore = create<AppState>((set, get) => ({
   connectSocket: () => {
     if (get().socket) return;
     
-    // Connect to backend with auth token.
-    // Token is passed only in the auth payload (server-side handshake), NOT in query params
-    // which would expose it in URLs, server logs, and infrastructure observability tooling.
-    // Connect to the /dashboard namespace registered on the backend.
-    // Use polling first so the connection works even when gunicorn runs
-    // a sync worker (sync workers cannot upgrade HTTP→WebSocket).
-    // Socket.IO will automatically upgrade to WebSocket once the
-    // eventlet/gevent worker is in place on the backend.
-    // Normalise ws(s):// → http(s):// so socket.io's HTTP polling handshake works.
-    // Socket.IO starts with an HTTP POST /socket.io/?EIO=4&transport=polling — passing
-    // a wss:// URL breaks that phase entirely, which is why no /socket.io/ requests
-    // appear in server logs at all.
     const rawBase = get().wsEndpoint.replace(/\/+$/, '');
     const base = rawBase
       .replace(/^wss:\/\//i, 'https://')
@@ -273,7 +251,6 @@ export const useStore = create<AppState>((set, get) => ({
       });
     });
 
-    // Track transport upgrades (polling -> websocket) once the handshake completes.
     socket.io.engine?.on?.('upgrade', (transport: any) => {
       set({ socketTransport: transport?.name === 'websocket' ? 'websocket' : 'polling' });
     });
@@ -287,8 +264,6 @@ export const useStore = create<AppState>((set, get) => ({
       });
     });
 
-    // Fired when the initial connection (or a reconnection attempt) fails —
-    // this is where the real reason (CORS, auth rejected, timeout, refused, etc.) shows up.
     socket.on('connect_error', (err: any) => {
       const message = err?.message || String(err) || 'Unknown connection error';
       set({
@@ -323,12 +298,8 @@ export const useStore = create<AppState>((set, get) => ({
       });
     });
     
-    // stats — emitted immediately on connect and on request_stats.
-    // build_live_stats() returns nested counters + top-level aliases.
     socket.on('stats', (data: any) => {
       if (!data || typeof data !== 'object') return;
-      // Top-level aliases added by the backend (messages_today, posts_published, etc.)
-      // Fall back to nested counters.messages_today for older backend versions.
       const c = data.counters || {};
       const a = data.analytics || {};
       get().updateStats({
@@ -338,7 +309,6 @@ export const useStore = create<AppState>((set, get) => ({
         apiCalls:       data.api_calls_today  ?? c.events_emitted                        ?? get().stats.apiCalls,
         guardianIssues: data.guardian_issues  ?? get().stats.guardianIssues,
       });
-      // Propagate service health from the stats snapshot when present
       if (data.services && typeof data.services === 'object') {
         const matrix: SystemHealth[] = Object.entries(data.services).map(([name, svc]: [string, any]) => ({
           id:          name,
@@ -364,8 +334,6 @@ export const useStore = create<AppState>((set, get) => ({
       set(state => ({ stats: { ...state.stats, postsPublished: state.stats.postsPublished + 1 } }));
     });
 
-    // api_payload — canonical event name emitted by the backend after_request hook.
-    // api_call    — alias also emitted by the backend for backward compatibility.
     const _handleApiPayload = (data?: any) => {
        set(state => ({ stats: { ...state.stats, apiCalls: state.stats.apiCalls + 1 } }));
        if (data && typeof data === 'object') {
@@ -385,7 +353,6 @@ export const useStore = create<AppState>((set, get) => ({
     socket.on('api_payload', _handleApiPayload);
     socket.on('api_call',    _handleApiPayload);
 
-    // payload_inbound — raw Facebook webhook payloads forwarded by the backend.
     socket.on('payload_inbound', (data?: any) => {
       if (data && typeof data === 'object') {
         get().addPayload({
@@ -414,14 +381,11 @@ export const useStore = create<AppState>((set, get) => ({
        }
     });
 
-    // service_status — backend can emit this when health changes.
-    // Also populated from the stats snapshot (see stats handler above).
     socket.on('service_status', (healthUpdates: SystemHealth[]) => {
       get().updateHealth(healthUpdates);
     });
 
     socket.on('scan_complete', (data: any) => {
-      // Backend ScanCompletedEvent may use different field names; normalise here.
       const alert: GuardianAlert = {
         id:       data.id       || data.scan_id || `scan_${Date.now()}`,
         severity: data.severity || (data.critical > 0 ? 'CRITICAL' : data.high > 0 ? 'HIGH' : 'MEDIUM'),
@@ -448,11 +412,7 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  messages: [
-    { id: 'm1', user: 'Operator_01', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80', message: 'Core neural pipeline initialized with vector 0x09', time: Date.now() - 120000, sentiment: 'positive' },
-    { id: 'm2', user: 'Guardian_Bot', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80', message: 'Security scan completed: 0 active threats detected in perimeter', time: Date.now() - 340000, sentiment: 'positive' },
-    { id: 'm3', user: 'System_Relay', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80', message: 'API rate limits nominal across all active gateway nodes', time: Date.now() - 600000, sentiment: 'neutral' }
-  ],
+  messages: [],
   addMessage: (msg) => set(state => ({ 
     messages: [msg, ...state.messages].slice(0, 20) 
   })),
@@ -469,10 +429,7 @@ export const useStore = create<AppState>((set, get) => ({
     return { healthMatrix: newHealth };
   }),
 
-  guardianAlerts: [
-    { id: '1', severity: 'HIGH', title: 'Unauthorized API Access Attempt', time: Date.now() - 3600000 },
-    { id: '2', severity: 'MEDIUM', title: 'MWK Converter Latency Spike', time: Date.now() - 7200000 },
-  ],
+  guardianAlerts: [],
   addAlert: (alert) => set(state => ({
     guardianAlerts: [alert, ...state.guardianAlerts].slice(0, 50),
     lastNotification: {
@@ -484,11 +441,7 @@ export const useStore = create<AppState>((set, get) => ({
     },
   })),
 
-  recentPosts: [
-    { id: 'p1', title: 'AI Automation Trends 2026', platform: 'linkedin', time: Date.now() - 1000 * 60 * 30, engagement: 245, thumbnail: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=150&q=80' },
-    { id: 'p2', title: 'Malawi Tech Ecosystem Report', platform: 'twitter', time: Date.now() - 1000 * 60 * 120, engagement: 1042, thumbnail: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=150&q=80' },
-    { id: 'p3', title: 'New Command Center Launch', platform: 'facebook', time: Date.now() - 1000 * 60 * 60 * 5, engagement: 856, thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=150&q=80' }
-  ],
+  recentPosts: [],
   addPost: (post) => set(state => ({
     recentPosts: [post, ...state.recentPosts].slice(0, 20),
     lastNotification: {
@@ -499,66 +452,7 @@ export const useStore = create<AppState>((set, get) => ({
     },
   })),
 
-  payloads: [
-    {
-      id: 'req_109283',
-      time: new Date(Date.now() - 30000).toLocaleTimeString(),
-      method: 'POST',
-      endpoint: 'graph.facebook.com/v19.0/me/messages',
-      status: 200,
-      latency: '145ms',
-      type: 'outbound',
-      request: {
-        messaging_type: "RESPONSE",
-        recipient: { id: "84759284759" },
-        message: { text: "We have received your query regarding the enterprise plan. A representative will connect shortly." }
-      },
-      response: {
-        recipient_id: "84759284759",
-        message_id: "m_029384092834"
-      }
-    },
-    {
-      id: 'req_109284',
-      time: new Date(Date.now() - 60000).toLocaleTimeString(),
-      method: 'POST',
-      endpoint: 'generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
-      status: 200,
-      latency: '1.2s',
-      type: 'outbound',
-      request: {
-        contents: [{ role: "user", parts: [{ text: "Extract sentiment and intent from: 'I need to upgrade my plan immediately, the current limits are blocking my team.'" }] }],
-        generationConfig: { temperature: 0.2 }
-      },
-      response: {
-        candidates: [{
-          content: { parts: [{ text: "{\n  \"sentiment\": \"urgent_positive\",\n  \"intent\": \"upgrade_subscription\"\n}" }] }
-        }]
-      }
-    },
-    {
-      id: 'req_109285',
-      time: new Date(Date.now() - 120000).toLocaleTimeString(),
-      method: 'POST',
-      endpoint: '/api/v1/webhook/facebook',
-      status: 400,
-      latency: '45ms',
-      type: 'inbound',
-      request: {
-        object: "page",
-        entry: [{
-          id: "10493819203",
-          time: 1718293840,
-          messaging: [{
-            sender: { id: "UNKNOWN_MALFORMED" }
-          }]
-        }]
-      },
-      response: {
-        error: "Malformed payload structure in messaging array."
-      }
-    }
-  ],
+  payloads: [],
   addPayload: (payload) => set(state => ({
     payloads: [payload, ...state.payloads].slice(0, 50)
   })),
@@ -567,12 +461,12 @@ export const useStore = create<AppState>((set, get) => ({
   dismissNotification: () => set({ lastNotification: null }),
 
   stats: {
-    messagesToday: 14052,
-    postsPublished: 124,
-    activeUsers: 843,
-    apiCalls: 1045920,
-    guardianIssues: 2,
-    revenueMonthly: 45250,
+    messagesToday: 0,
+    postsPublished: 0,
+    activeUsers: 0,
+    apiCalls: 0,
+    guardianIssues: 0,
+    revenueMonthly: 0,
   },
   updateStats: (partial) => set(state => ({ stats: { ...state.stats, ...partial } })),
 
@@ -596,8 +490,6 @@ export const useStore = create<AppState>((set, get) => ({
     const { restEndpoint, masterToken } = get();
     let loadedLive = false;
 
-    // Warn clearly when no master token is configured — every authenticated
-    // endpoint will return 401 without it. The user must set it in Settings.
     if (!masterToken) {
       console.warn(
         '[Prometheus] masterToken is not set. All authenticated API calls will return 401. ' +
@@ -605,7 +497,6 @@ export const useStore = create<AppState>((set, get) => ({
       );
     }
 
-    // 1. Try querying Supabase if configured with real credentials
     if (isSupabaseConfigured()) {
       try {
         const { data: supaMsgs } = await supabase.from('messages').select('*').limit(20);
@@ -636,7 +527,6 @@ export const useStore = create<AppState>((set, get) => ({
       }
     }
 
-    // 2. Try fetching from custom REST API
     if (restEndpoint) {
       try {
         const baseUrl = restEndpoint.endsWith('/') ? restEndpoint.slice(0, -1) : restEndpoint;
@@ -649,13 +539,10 @@ export const useStore = create<AppState>((set, get) => ({
           headers['x-api-key'] = masterToken;
         }
 
-        // Try fetching live stats from real endpoint.
-        // build_live_stats() returns nested counters + top-level aliases (messages_today, etc.)
         const statsRes = await fetch(`${baseUrl}/dashboard/live`, { headers }).catch(() => null);
         if (statsRes && statsRes.ok) {
           const d = await statsRes.json();
           if (d) {
-            // Support both top-level aliases (new) and nested counters (legacy)
             const c = d.counters || {};
             const a = d.analytics || {};
             get().updateStats({
@@ -669,11 +556,9 @@ export const useStore = create<AppState>((set, get) => ({
           }
         }
 
-        // Try fetching messages — backend returns { ok, messages: [...], count }
         const msgsRes = await fetch(`${baseUrl}/messages`, { headers }).catch(() => null);
         if (msgsRes && msgsRes.ok) {
           const msgsData = await msgsRes.json();
-          // Backend wraps in { ok, messages, count } — support both shapes
           const msgs = Array.isArray(msgsData)
             ? msgsData
             : Array.isArray(msgsData?.messages)
@@ -685,7 +570,6 @@ export const useStore = create<AppState>((set, get) => ({
           }
         }
 
-        // Try fetching posts — backend returns { ok, posts: [...], total }
         const postsRes = await fetch(`${baseUrl}/posts`, { headers }).catch(() => null);
         if (postsRes && postsRes.ok) {
           const postsData = await postsRes.json();
@@ -700,11 +584,6 @@ export const useStore = create<AppState>((set, get) => ({
           }
         }
 
-        // Note: /alerts, /payloads, and /logs do not exist on the backend.
-        // Guardian alerts come from the /scan WebSocket event (scan_complete).
-        // Payload traffic comes from the socket api_payload / payload_inbound events.
-
-        // Try fetching health matrix from /health/deep (returns object, not array)
         const healthRes = await fetch(`${baseUrl}/health/deep`, { headers }).catch(() => null);
         if (healthRes && healthRes.ok) {
           const healthData = await healthRes.json();
@@ -742,14 +621,11 @@ export const useStore = create<AppState>((set, get) => ({
       ? { Authorization: `Bearer ${masterToken}` }
       : {};
 
-    // Fetch backend config immediately on startup
     fetch(`${base}/status`, { headers })
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) set({ backendConfig: data }); })
       .catch(() => {});
 
-    // Poll stats + health every 2 min — pause when tab is hidden to avoid
-    // hammering backend endpoints that may trigger expensive AI calls.
     const timer = setInterval(async () => {
       if (document.visibilityState !== 'visible') return;
       try {
@@ -787,7 +663,6 @@ export const useStore = create<AppState>((set, get) => ({
 
     set({ pollingTimer: timer });
 
-    // Supabase real-time subscriptions (if Supabase is configured)
     if (!isSupabaseConfigured()) return;
 
     const channel = supabase
