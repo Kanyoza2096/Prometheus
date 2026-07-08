@@ -44,7 +44,7 @@ export default function CommandPalette() {
     { id: '1',  icon: Monitor,      title: 'Open Main Console',    subtitle: 'Go to Dashboard',                         action: () => navigate('/') },
     { id: '2',  icon: Terminal,     title: 'Launch Terminal',       subtitle: 'Toggle Command Line Interface',           action: toggleTerminal },
     { id: '3',  icon: Globe,        title: 'Broadcast Network',     subtitle: 'Manage Social Posts',                     action: () => navigate('/posts') },
-    { id: '4',  icon: BrainCircuit, title: 'AI Engine',             subtitle: 'Manage Persona & Prompts',                action: () => navigate('/ai-engine') },
+    { id: '4',  icon: BrainCircuit, title: 'AI Engine',             subtitle: 'Manage Persona & Prompts',                action: () => navigate('/ai-brain') },                     
     { id: '5',  icon: Shield,       title: 'Guardian Logs',         subtitle: 'Security and Threat Analysis',            action: () => navigate('/guardian') },
     { id: '6',  icon: GitBranch,    title: 'Workflows',             subtitle: 'Automation Task Pipelines',               action: () => navigate('/workflows') },
     { id: '7',  icon: Network,      title: 'Prometheus Metrics',    subtitle: 'Live Infrastructure Telemetry',           action: () => navigate('/prometheus') },
