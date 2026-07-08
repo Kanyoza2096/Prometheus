@@ -150,6 +150,7 @@ const INITIAL_HEALTH: SystemHealth[] = [
   { id: 'gemini', name: 'Gemini AI', status: 'online', latency: 45, lastChecked: Date.now(), uptime: 99.99 },
   { id: 'fb', name: 'Facebook API', status: 'online', latency: 120, lastChecked: Date.now(), uptime: 99.95 },
   { id: 'supa', name: 'Supabase', status: 'online', latency: 15, lastChecked: Date.now(), uptime: 100 },
+  { id: 'redis', name: 'Upstash Redis', status: 'online', latency: 8, lastChecked: Date.now(), uptime: 99.9 },
   { id: 'mwk', name: 'MWK Converter', status: 'degraded', latency: 850, lastChecked: Date.now(), uptime: 98.5 },
   { id: 'play', name: 'Playwright', status: 'online', latency: 320, lastChecked: Date.now(), uptime: 99.1 },
   { id: 'guard', name: 'Code Guardian', status: 'online', latency: 85, lastChecked: Date.now(), uptime: 100 },
