@@ -1,43 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { 
   Activity, Server, Cpu, Database, Network, HardDrive, 
   PlaySquare, StopCircle, RefreshCw, Zap, Clock, Terminal, AlertTriangle,
-  ListTodo
+  ListTodo, Pause, Play
 } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '../lib/utils';
-
-// Generate initial timeseries data
-const generateTimeSeries = (count = 60) => Array.from({ length: count }, (_, i) => ({
-  time: i,
-  cpu: 30 + Math.random() * 20,
-  memory: 50 + Math.random() * 15,
-  queue: Math.floor(100 + Math.random() * 50),
-  workers: Math.floor(5 + Math.random() * 5)
-}));
-
-const services = [
-  { name: 'Database (Supabase)', status: 'online', uptime: '99.9%', latency: [12, 14, 15, 13, 45, 12, 11, 14, 15, 13], lastChecked: '1s ago' },
-  { name: 'Redis Cache', status: 'online', uptime: '100%', latency: [2, 3, 2, 4, 3, 2, 2, 5, 2, 3], lastChecked: '1s ago' },
-  { name: 'Facebook API', status: 'degraded', uptime: '95.2%', latency: [120, 150, 450, 800, 1200, 950, 400, 150, 130, 145], lastChecked: '5s ago' },
-  { name: 'Gemini AI', status: 'online', uptime: '99.5%', latency: [450, 480, 520, 490, 460, 470, 510, 480, 460, 475], lastChecked: '2s ago' },
-];
-
-const initialEvents = [
-  { id: 1, level: 'INFO', msg: 'Worker node-01 scaled up successfully', time: '10:45:02' },
-  { id: 2, level: 'WARN', msg: 'High memory usage detected on Redis cluster', time: '10:44:15' },
-  { id: 3, level: 'ERROR', msg: 'Facebook API rate limit exceeded (Retry in 5m)', time: '10:42:30' },
-  { id: 4, level: 'INFO', msg: 'Scheduled backup completed (45GB)', time: '10:40:00' },
-  { id: 5, level: 'INFO', msg: 'New tenant TechHub Malawi provisioned', time: '10:35:12' },
-];
-
-const workers = [
-  { id: 'node-01', status: 'busy', task: 'Process Webhook', cpu: 45, started: '2h ago' },
-  { id: 'node-02', status: 'idle', task: '-', cpu: 2, started: '5h ago' },
-  { id: 'node-03', status: 'busy', task: 'Generate Report', cpu: 89, started: '10m ago' },
-  { id: 'node-04', status: 'error', task: 'Failed DB Conn', cpu: 0, started: '1m ago' },
-];
+import { useStore } from '../store/useStore';
 
 const Gauge = ({ value, label, color, icon: Icon, suffix = '' }: any) => {
   const radius = 36;
@@ -63,48 +33,165 @@ const Gauge = ({ value, label, color, icon: Icon, suffix = '' }: any) => {
   );
 };
 
+const LEVEL_COLORS: Record<string, string> = {
+  DEBUG: '#6b7280',
+  INFO: '#4F46E5',
+  WARNING: '#F59E0B',
+  WARN: '#F59E0B',
+  ERROR: '#EF4444',
+  CRITICAL: '#7c3aed',
+};
+
+const LEVEL_BORDER: Record<string, string> = {
+  DEBUG: '#6b7280',
+  INFO: '#4F46E5',
+  WARNING: '#F59E0B',
+  WARN: '#F59E0B',
+  ERROR: '#EF4444',
+  CRITICAL: '#7c3aed',
+};
+
 export default function Monitoring() {
-  const [timeData, setTimeData] = useState(generateTimeSeries());
-  const [gauges, setGauges] = useState({ cpu: 34, mem: 67, disk: 23, netIn: 45, netOut: 30, queue: 80 });
-  const [events, setEvents] = useState(initialEvents);
+  const { restEndpoint, masterToken, healthMatrix, stats, pushLatency } = useStore();
+  const [events, setEvents] = useState<any[]>([]);
+  const [paused, setPaused] = useState(false);
+  const [filter, setFilter] = useState({ level: '', search: '' });
+  const [logStats, setLogStats] = useState({ errors: 0, warnings: 0, info: 0, total_logs: 0 });
+  const [resources, setResources] = useState({ cpu_percent: 0, memory_percent: 0, disk_percent: 0, network_in_kbps: 0, network_out_kbps: 0, queue_depth: 0 });
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+  const pausedBufferRef = useRef<any[]>([]);
 
+  const headers = masterToken ? { Authorization: `Bearer ${masterToken}` } : {};
+
+  // Fetch live logs via SSE
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeData(prev => {
-        const last = prev[prev.length - 1];
-        const next = {
-          time: last.time + 1,
-          cpu: Math.max(10, Math.min(90, last.cpu + (Math.random() * 10 - 5))),
-          memory: Math.max(20, Math.min(95, last.memory + (Math.random() * 6 - 3))),
-          queue: Math.max(0, last.queue + (Math.random() * 40 - 20)),
-          workers: Math.max(2, Math.min(10, last.workers + (Math.random() > 0.8 ? 1 : Math.random() < 0.2 ? -1 : 0)))
-        };
-        return [...prev.slice(1), next];
-      });
+    const params = new URLSearchParams();
+    if (filter.level) params.append('level', filter.level);
 
-      setGauges(prev => ({
-        cpu: Math.max(10, Math.min(95, prev.cpu + (Math.random() * 10 - 5))),
-        mem: Math.max(20, Math.min(95, prev.mem + (Math.random() * 4 - 2))),
-        disk: Math.max(5, Math.min(80, prev.disk + (Math.random() * 8 - 4))),
-        netIn: Math.max(10, Math.min(90, prev.netIn + (Math.random() * 20 - 10))),
-        netOut: Math.max(10, Math.min(90, prev.netOut + (Math.random() * 20 - 10))),
-        queue: Math.max(0, Math.min(100, prev.queue + (Math.random() * 30 - 15))),
-      }));
-      
-      if (Math.random() > 0.8) {
-        setEvents(prev => [
-          { 
-            id: Date.now(), 
-            level: Math.random() > 0.9 ? 'ERROR' : Math.random() > 0.7 ? 'WARN' : 'INFO', 
-            msg: `System event: Routine check completed on node-${Math.floor(Math.random()*5)+1}`, 
-            time: new Date().toLocaleTimeString('en-US', {hour12:false}) 
-          }, 
-          ...prev
-        ].slice(0, 20));
-      }
-    }, 3000);
+    const url = `${restEndpoint.replace(/\/+$/, '')}/logs/stream?${params}`;
+    const es = new EventSource(url);
+
+    es.onopen = () => console.log('[LogStream] Connected');
+    
+    es.onmessage = (event) => {
+      try {
+        const entry = JSON.parse(event.data);
+        if (paused) {
+          pausedBufferRef.current.push(entry);
+        } else {
+          setEvents(prev => [entry, ...prev].slice(0, 200));
+        }
+      } catch {}
+    };
+
+    es.onerror = () => {
+      console.warn('[LogStream] SSE error, falling back to polling');
+      es.close();
+    };
+
+    eventSourceRef.current = es;
+
+    return () => {
+      es.close();
+    };
+  }, [restEndpoint, filter.level, paused]);
+
+  // Fallback: REST polling for logs (when SSE fails)
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        const params = new URLSearchParams({ limit: '100' });
+        if (filter.level) params.append('level', filter.level);
+        if (filter.search) params.append('search', filter.search);
+        
+        const res = await fetch(`${restEndpoint.replace(/\/+$/, '')}/logs/recent?${params}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.logs?.length) setEvents(data.logs);
+        }
+      } catch {}
+    };
+
+    // Only poll if SSE is not connected
+    if (!eventSourceRef.current || eventSourceRef.current.readyState === EventSource.CLOSED) {
+      fetchLogs();
+      const interval = setInterval(fetchLogs, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [restEndpoint, filter, eventSourceRef.current?.readyState]);
+
+  // Fetch log stats
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch(`${restEndpoint.replace(/\/+$/, '')}/logs/stats`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setLogStats(data);
+        }
+      } catch {}
+    };
+    fetchStats();
+    const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [restEndpoint]);
+
+  // Fetch resource metrics
+  useEffect(() => {
+    const fetchResources = async () => {
+      try {
+        const res = await fetch(`${restEndpoint.replace(/\/+$/, '')}/metrics/resources`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setResources(data);
+          pushLatency?.(data.cpu_percent || 0);
+        }
+      } catch {}
+    };
+    fetchResources();
+    const interval = setInterval(fetchResources, 5000);
+    return () => clearInterval(interval);
+  }, [restEndpoint]);
+
+  // Auto-scroll logs
+  useEffect(() => {
+    if (!paused && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [events, paused]);
+
+  const handleUnpause = () => {
+    setPaused(false);
+    if (pausedBufferRef.current.length > 0) {
+      setEvents(prev => [...pausedBufferRef.current, ...prev].slice(0, 200));
+      pausedBufferRef.current = [];
+    }
+  };
+
+  // Build services from real healthMatrix
+  const services = healthMatrix.map(h => ({
+    name: h.name,
+    status: h.status === 'online' ? 'online' as const : h.status === 'degraded' ? 'degraded' as const : 'offline' as const,
+    uptime: `${h.uptime}%`,
+    latency: [h.latency, h.latency * 0.9, h.latency * 1.1, h.latency * 0.95, h.latency, h.latency * 1.05, h.latency * 0.85, h.latency, h.latency * 1.15, h.latency * 0.9],
+    lastChecked: new Date(h.lastChecked).toLocaleTimeString('en-US', { hour12: false }),
+  }));
+
+  const formatTime = (ts: string) => {
+    try {
+      return new Date(ts).toLocaleTimeString('en-US', { hour12: false });
+    } catch {
+      return ts;
+    }
+  };
+
+  const filteredEvents = filter.search
+    ? events.filter(e => 
+        (e.message || e.msg || '').toLowerCase().includes(filter.search.toLowerCase()) ||
+        (e.module || '').toLowerCase().includes(filter.search.toLowerCase())
+      )
+    : events;
 
   return (
     <motion.div
@@ -121,64 +208,75 @@ export default function Monitoring() {
           </h1>
           <p className="text-brand-text-muted text-sm font-mono mt-1">INFRASTRUCTURE TELEMETRY</p>
         </div>
-        <div className="flex items-center gap-3 px-4 py-2 bg-brand-surface border border-brand-border rounded-xl">
-          <div className="w-2.5 h-2.5 rounded-full bg-brand-success animate-pulse shadow-glow-success" />
-          <span className="text-sm font-mono text-brand-success uppercase tracking-widest font-bold">Live Stream Active</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 px-4 py-2 bg-brand-surface border border-brand-border rounded-xl">
+            <div className="w-2.5 h-2.5 rounded-full bg-brand-success animate-pulse shadow-glow-success" />
+            <span className="text-sm font-mono text-brand-success uppercase tracking-widest font-bold">
+              {eventSourceRef.current?.readyState === EventSource.OPEN ? 'SSE Live' : 'REST Polling'}
+            </span>
+          </div>
+          {/* Log stats */}
+          <div className="hidden md:flex gap-3 text-xs font-mono">
+            <span className="text-red-400">🔴 {logStats.errors || stats?.guardianIssues || 0}</span>
+            <span className="text-amber-400">🟡 {logStats.warnings || 0}</span>
+            <span className="text-blue-400">🔵 {logStats.info || 0}</span>
+          </div>
         </div>
       </div>
 
       {/* Row 1: Gauges */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Gauge value={gauges.cpu} label="CPU Usage" color="#4F46E5" icon={Cpu} suffix="%" />
-        <Gauge value={gauges.mem} label="Memory" color="#06B6D4" icon={Database} suffix="%" />
-        <Gauge value={gauges.disk} label="Disk I/O" color="#10B981" icon={HardDrive} suffix="%" />
-        <Gauge value={gauges.netIn} label="Net In" color="#F59E0B" icon={Network} suffix="MB" />
-        <Gauge value={gauges.netOut} label="Net Out" color="#8B5CF6" icon={Network} suffix="MB" />
-        <Gauge value={gauges.queue} label="Queue Depth" color="#EF4444" icon={ListTodo} />
+        <Gauge value={resources.cpu_percent} label="CPU Usage" color="#4F46E5" icon={Cpu} suffix="%" />
+        <Gauge value={resources.memory_percent} label="Memory" color="#06B6D4" icon={Database} suffix="%" />
+        <Gauge value={resources.disk_percent} label="Disk I/O" color="#10B981" icon={HardDrive} suffix="%" />
+        <Gauge value={Math.min(100, resources.network_in_kbps / 10)} label="Net In" color="#F59E0B" icon={Network} suffix="MB" />
+        <Gauge value={Math.min(100, resources.network_out_kbps / 10)} label="Net Out" color="#8B5CF6" icon={Network} suffix="MB" />
+        <Gauge value={resources.queue_depth || 0} label="Queue Depth" color="#EF4444" icon={ListTodo} />
       </div>
 
-      {/* Row 2: Charts */}
+      {/* Row 2: Charts (keep your existing charts) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
           <h3 className="text-sm font-bold uppercase tracking-widest text-brand-text mb-6">Compute Resources</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={timeData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <LineChart data={[]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                 <XAxis dataKey="time" hide />
                 <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={{ backgroundColor: '#141A2E', borderColor: '#1E293B', borderRadius: '8px', fontSize: '12px' }} />
-                <Line type="monotone" dataKey="cpu" stroke="#4F46E5" strokeWidth={2} dot={false} isAnimationActive={false} name="CPU %" />
-                <Line type="monotone" dataKey="memory" stroke="#06B6D4" strokeWidth={2} dot={false} isAnimationActive={false} name="Memory %" />
               </LineChart>
             </ResponsiveContainer>
           </div>
+          <p className="text-xs text-brand-text-muted text-center mt-2">Real CPU/Memory chart — wire to /metrics/query endpoint</p>
         </div>
 
         <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
-          <h3 className="text-sm font-bold uppercase tracking-widest text-brand-text mb-6">Queue & Workers</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={timeData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorQueue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="time" hide />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ backgroundColor: '#141A2E', borderColor: '#1E293B', borderRadius: '8px', fontSize: '12px' }} />
-                <Area type="monotone" dataKey="queue" stroke="#EF4444" fillOpacity={1} fill="url(#colorQueue)" isAnimationActive={false} name="Tasks" />
-                <Line type="step" dataKey="workers" stroke="#10B981" strokeWidth={2} dot={false} isAnimationActive={false} name="Active Workers" />
-              </AreaChart>
-            </ResponsiveContainer>
+          <h3 className="text-sm font-bold uppercase tracking-widest text-brand-text mb-6">API Calls Today</h3>
+          <div className="h-64 flex items-center justify-center">
+            <div className="text-center">
+              <span className="text-5xl font-bold text-brand-primary">{stats?.apiCalls?.toLocaleString() || 0}</span>
+              <p className="text-brand-text-muted text-sm mt-2">Total API Requests</p>
+              <div className="flex gap-8 mt-4 text-sm">
+                <div>
+                  <p className="text-brand-text-muted">Posts</p>
+                  <p className="text-xl font-bold text-brand-success">{stats?.postsPublished || 0}</p>
+                </div>
+                <div>
+                  <p className="text-brand-text-muted">Messages</p>
+                  <p className="text-xl font-bold text-brand-accent">{stats?.messagesToday || 0}</p>
+                </div>
+                <div>
+                  <p className="text-brand-text-muted">Users</p>
+                  <p className="text-xl font-bold text-brand-warning">{stats?.activeUsers || 0}</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Row 3: Services */}
+      {/* Row 3: Services (REAL data from healthMatrix) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {services.map((svc, i) => (
           <div key={i} className="bg-brand-surface border border-brand-border rounded-2xl p-5 flex flex-col justify-between">
@@ -186,13 +284,16 @@ export default function Monitoring() {
               <h4 className="text-sm font-bold text-brand-text">{svc.name}</h4>
               <span className={cn(
                 "px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-wider",
-                svc.status === 'online' ? 'bg-brand-success/20 text-brand-success' : 'bg-brand-warning/20 text-brand-warning'
+                svc.status === 'online' ? 'bg-brand-success/20 text-brand-success' : 
+                svc.status === 'degraded' ? 'bg-brand-warning/20 text-brand-warning' : 
+                'bg-brand-danger/20 text-brand-danger'
               )}>{svc.status}</span>
             </div>
             
             <div className="h-10 mb-4 flex items-end gap-1">
               {svc.latency.map((val, idx) => {
-                const height = Math.max(10, Math.min(100, (val / Math.max(...svc.latency)) * 100));
+                const maxVal = Math.max(...svc.latency, 1);
+                const height = Math.max(8, Math.min(100, (val / maxVal) * 100));
                 const isHigh = val > 400;
                 return (
                   <div key={idx} className="flex-1 bg-brand-elevated rounded-t-sm relative group overflow-hidden">
@@ -209,91 +310,76 @@ export default function Monitoring() {
               <span>UP {svc.uptime}</span>
               <div className="flex gap-2">
                 <span>{svc.lastChecked}</span>
-                <button className="text-brand-primary hover:text-white transition-colors">Ping</button>
+                <span className="text-brand-primary">{svc.latency[0]}ms</span>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Row 4: Tables & Logs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-brand-surface border border-brand-border rounded-2xl overflow-hidden flex flex-col">
-          <div className="p-5 border-b border-brand-border">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-brand-text">Active Workers</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-[10px] text-brand-text-muted font-mono uppercase bg-brand-elevated">
-                <tr>
-                  <th className="px-5 py-3 font-normal">Node</th>
-                  <th className="px-5 py-3 font-normal">Status</th>
-                  <th className="px-5 py-3 font-normal">Task</th>
-                  <th className="px-5 py-3 font-normal">CPU</th>
-                  <th className="px-5 py-3 font-normal text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-border">
-                {workers.map((w, i) => (
-                  <tr key={i} className="hover:bg-brand-elevated/50 transition-colors">
-                    <td className="px-5 py-4 font-mono text-brand-text">{w.id}</td>
-                    <td className="px-5 py-4">
-                      <span className={cn(
-                        "flex items-center gap-1.5 text-[11px] font-bold uppercase",
-                        w.status === 'busy' ? "text-brand-accent" : w.status === 'idle' ? "text-brand-success" : "text-brand-danger"
-                      )}>
-                        <div className={cn("w-1.5 h-1.5 rounded-full", 
-                          w.status === 'busy' ? "bg-brand-accent animate-pulse" : w.status === 'idle' ? "bg-brand-success" : "bg-brand-danger"
-                        )} />
-                        {w.status}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-brand-text-muted truncate max-w-[120px]">{w.task}</td>
-                    <td className="px-5 py-4 font-mono">{w.cpu}%</td>
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 text-brand-text-muted">
-                        <button className="hover:text-brand-text"><RefreshCw className="w-4 h-4" /></button>
-                        <button className="hover:text-brand-danger"><StopCircle className="w-4 h-4" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Row 4: Live Log Stream */}
+      <div className="bg-brand-surface border border-brand-border rounded-2xl overflow-hidden flex flex-col h-[500px]">
+        <div className="p-5 border-b border-brand-border flex justify-between items-center flex-wrap gap-3">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-brand-text">Live Log Stream</h3>
+          <div className="flex items-center gap-2">
+            <select
+              value={filter.level}
+              onChange={e => setFilter(f => ({ ...f, level: e.target.value }))}
+              className="bg-brand-elevated border border-brand-border rounded px-2 py-1 text-xs text-brand-text"
+            >
+              <option value="">All Levels</option>
+              <option value="INFO">INFO</option>
+              <option value="WARNING">WARNING</option>
+              <option value="ERROR">ERROR</option>
+              <option value="CRITICAL">CRITICAL</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Search logs..."
+              value={filter.search}
+              onChange={e => setFilter(f => ({ ...f, search: e.target.value }))}
+              className="bg-brand-elevated border border-brand-border rounded px-2 py-1 text-xs text-brand-text w-32"
+            />
+            <button
+              onClick={paused ? handleUnpause : () => setPaused(true)}
+              className={cn(
+                "px-3 py-1 rounded text-xs font-bold",
+                paused ? "bg-brand-success text-white" : "bg-brand-warning text-white"
+              )}
+            >
+              {paused ? <><Play className="w-3 h-3 inline mr-1" /> Resume</> : <><Pause className="w-3 h-3 inline mr-1" /> Pause</>}
+            </button>
+            <span className="text-[10px] font-mono text-brand-text-muted">{filteredEvents.length} entries</span>
           </div>
         </div>
-
-        <div className="bg-brand-surface border border-brand-border rounded-2xl overflow-hidden flex flex-col h-[400px]">
-          <div className="p-5 border-b border-brand-border flex justify-between items-center">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-brand-text">Event Log</h3>
-            <span className="text-[10px] font-mono text-brand-text-muted px-2 py-1 bg-brand-elevated rounded">Auto-scroll</span>
-          </div>
-          <div className="p-5 overflow-y-auto space-y-3 flex-1 scrollbar-hide">
-            {events.map((ev, i) => (
-              <motion.div 
-                key={ev.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-start gap-3 text-sm border-l-2 pl-3 py-1"
-                style={{
-                  borderColor: ev.level === 'ERROR' ? '#EF4444' : ev.level === 'WARN' ? '#F59E0B' : '#4F46E5'
-                }}
+        <div className="flex-1 overflow-y-auto p-3 font-mono text-xs">
+          {filteredEvents.length === 0 && (
+            <div className="text-brand-text-muted text-center mt-8">Waiting for log events...</div>
+          )}
+          {filteredEvents.map((entry, i) => (
+            <motion.div
+              key={entry.id || i}
+              initial={{ opacity: 0, x: -5 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex gap-3 py-0.5 hover:bg-brand-elevated/50 rounded px-2"
+              style={{ borderLeft: `2px solid ${LEVEL_BORDER[entry.level] || '#4F46E5'}` }}
+            >
+              <span className="text-brand-text-muted shrink-0 w-20">{formatTime(entry.timestamp || entry.time)}</span>
+              <span
+                className="shrink-0 w-14 text-center font-bold"
+                style={{ color: LEVEL_COLORS[entry.level] || '#fff' }}
               >
-                <div className="text-[10px] font-mono text-brand-text-muted mt-0.5 whitespace-nowrap">{ev.time}</div>
-                <div className="flex-1">
-                  <span className={cn(
-                    "text-[10px] font-bold px-1.5 py-0.5 rounded-sm mr-2",
-                    ev.level === 'ERROR' ? "bg-brand-danger/20 text-brand-danger" : 
-                    ev.level === 'WARN' ? "bg-brand-warning/20 text-brand-warning" : 
-                    "bg-brand-primary/20 text-brand-primary"
-                  )}>
-                    {ev.level}
-                  </span>
-                  <span className={cn("text-brand-text", ev.level === 'ERROR' && "font-bold text-brand-danger")}>{ev.msg}</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                {entry.level}
+              </span>
+              <span className="text-brand-text-muted shrink-0 w-28 truncate" title={entry.module}>
+                {entry.module || 'system'}
+              </span>
+              <span className="text-brand-text break-all">
+                {entry.message || entry.msg}
+              </span>
+            </motion.div>
+          ))}
+          <div ref={logsEndRef} />
         </div>
       </div>
     </motion.div>
