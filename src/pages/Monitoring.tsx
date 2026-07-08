@@ -8,6 +8,7 @@ import {
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
+import { connectLogStream, fetchRecentLogs, fetchLogStats, fetchResources } from '../services/api';
 
 const Gauge = ({ value, label, color, icon: Icon, suffix = '' }: any) => {
   const radius = 36;
