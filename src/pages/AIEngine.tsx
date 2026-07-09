@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BrainCircuit, SlidersHorizontal, Target, Zap, Bot, MessageSquareText, Check, Loader2, AlertCircle, Wifi, WifiOff } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { BrainCircuit, SlidersHorizontal, Target, Zap, Bot, MessageSquareText, Check, Loader2, AlertCircle, Wifi, WifiOff, Send, RotateCcw } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
-import { fetchStatus, updateAIConfig } from '../lib/api';
+import { fetchStatus, updateAIConfig, fetchPersona, chatWithAI, resetPersona } from '../lib/api';
 
 const PERSONA_KEY = 'kanyoza_persona_v2';
 
@@ -62,6 +62,68 @@ export default function AIEngine() {
     queryFn:  () => fetchStatus(cfg),
     retry: 1,
     staleTime: 60_000,
+  });
+
+  // Fetch real persona from backend and prefer it over the local cache
+  const { data: personaData } = useQuery({
+    queryKey: ['ai-persona', restEndpoint],
+    queryFn:  () => fetchPersona(cfg),
+    retry: 1,
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (personaData) {
+      setTone(personaData.tone ?? saved.tone);
+      setAggression(personaData.aggression ?? saved.aggression);
+      setHumor(personaData.humor ?? saved.humor);
+      if (personaData.model) setPrimaryModel(personaData.model);
+      if (personaData.system_prompt) setPromptOverride(personaData.system_prompt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personaData]);
+
+  // Test chat
+  const [chatInput, setChatInput] = useState('');
+  const [chatLog, setChatLog] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const chatMut = useMutation({
+    mutationFn: (msg: string) => chatWithAI(cfg, msg),
+    onSuccess: (d: any) => {
+      const reply = d?.response || d?.reply || 'No response received.';
+      setChatLog(prev => [...prev, { role: 'ai', text: reply }]);
+    },
+    onError: (err: any) => {
+      setChatLog(prev => [...prev, { role: 'ai', text: `⚠ ${err?.message || 'Chat request failed.'}` }]);
+    },
+  });
+  const handleSendChat = () => {
+    const msg = chatInput.trim();
+    if (!msg || chatMut.isPending) return;
+    setChatLog(prev => [...prev, { role: 'user', text: msg }]);
+    setChatInput('');
+    chatMut.mutate(msg);
+  };
+
+  const resetMut = useMutation({
+    mutationFn: () => resetPersona(cfg),
+    onSuccess: (d: any) => {
+      const p = d?.persona ?? DEFAULT_PERSONA;
+      const next: StoredPersona = {
+        tone: p.tone ?? DEFAULT_PERSONA.tone,
+        aggression: p.aggression ?? DEFAULT_PERSONA.aggression,
+        humor: p.humor ?? DEFAULT_PERSONA.humor,
+        model: p.model ?? DEFAULT_PERSONA.model,
+        system_prompt: p.system_prompt ?? DEFAULT_PERSONA.system_prompt,
+      };
+      setTone(next.tone);
+      setAggression(next.aggression);
+      setHumor(next.humor);
+      setPrimaryModel(next.model);
+      setPromptOverride(next.system_prompt);
+      savePersona(next);
+      showToast('Persona reset to defaults.');
+    },
+    onError: (err: any) => showToast(err?.message || 'Reset failed.', 'error'),
   });
 
   // Build the available models list — prefer backend's real model
@@ -164,6 +226,14 @@ export default function AIEngine() {
               Offline — using saved persona
             </span>
           )}
+          <button
+            onClick={() => resetMut.mutate()}
+            disabled={resetMut.isPending}
+            className="bg-brand-elevated border border-brand-border text-brand-text-muted px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider hover:border-brand-danger/40 hover:text-brand-danger transition-colors flex items-center gap-2 disabled:opacity-60"
+          >
+            {resetMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+            Reset to Defaults
+          </button>
         </div>
       </div>
 
@@ -331,6 +401,52 @@ export default function AIEngine() {
             </h2>
             <div className="p-4 bg-brand-bg rounded-xl border border-brand-border mt-4 relative z-10">
               <p className="text-sm text-brand-text-muted italic leading-relaxed">"{getPreviewText()}"</p>
+            </div>
+          </div>
+
+          <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col">
+            <h2 className="text-sm font-bold uppercase tracking-widest flex items-center mb-4 text-brand-text">
+              <MessageSquareText className="w-4 h-4 mr-2 text-brand-accent" />
+              Test Chat
+            </h2>
+            <div className="flex-1 max-h-64 overflow-y-auto space-y-2 mb-4 pr-1">
+              {chatLog.length === 0 && (
+                <p className="text-xs text-brand-text-muted font-mono">Send a message to test the live AI response.</p>
+              )}
+              {chatLog.map((m, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'text-xs font-sans rounded-xl px-3 py-2 max-w-[90%]',
+                    m.role === 'user'
+                      ? 'bg-brand-primary/10 border border-brand-primary/20 text-brand-text ml-auto'
+                      : 'bg-brand-elevated border border-brand-border text-brand-text-muted'
+                  )}
+                >
+                  {m.text}
+                </div>
+              ))}
+              {chatMut.isPending && (
+                <div className="flex items-center gap-2 text-xs text-brand-text-muted font-mono">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> thinking…
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSendChat()}
+                placeholder="Type a test message…"
+                className="flex-1 bg-brand-bg border border-brand-border rounded-xl px-3 py-2 text-xs text-brand-text font-sans focus:outline-none focus:border-brand-primary"
+              />
+              <button
+                onClick={handleSendChat}
+                disabled={chatMut.isPending || !chatInput.trim()}
+                className="bg-brand-primary text-white px-3 py-2 rounded-xl disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>

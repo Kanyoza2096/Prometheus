@@ -414,3 +414,14 @@ export const deletePost = (cfg: ApiConfig, id: string | number) =>
 
 export const forcePostNow = (cfg: ApiConfig) =>
   request<{ ok: boolean; queued?: boolean; message?: string }>(cfg, '/bot/post', { method: 'POST' });
+
+// ── AI Chat / Persona reset ───────────────────────────────────────────────────
+
+export const chatWithAI = (cfg: ApiConfig, message: string) =>
+  request<{ ok: boolean; response?: string; reply?: string }>(cfg, '/ai/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  });
+
+export const resetPersona = (cfg: ApiConfig) =>
+  request<{ ok: boolean; persona?: PersonaPayload }>(cfg, '/persona/reset', { method: 'POST' });
