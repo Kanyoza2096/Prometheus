@@ -425,3 +425,233 @@ export const chatWithAI = (cfg: ApiConfig, message: string) =>
 
 export const resetPersona = (cfg: ApiConfig) =>
   request<{ ok: boolean; persona?: PersonaPayload }>(cfg, '/persona/reset', { method: 'POST' });
+
+// ── Workspaces (Tenants) ──────────────────────────────────────────────────────
+
+export interface Workspace {
+  id: string | number;
+  name: string;
+  slug: string;
+  plan: 'free' | 'pro' | 'business' | string;
+  status?: string;
+  owner_email?: string;
+  member_count?: number;
+  created_at?: string;
+  [k: string]: unknown;
+}
+
+export const fetchWorkspaces = (cfg: ApiConfig) =>
+  request<{ workspaces: Workspace[] }>(cfg, '/workspaces');
+
+export const fetchWorkspace = (cfg: ApiConfig, id: string | number) =>
+  request<{ workspace: Workspace }>(cfg, `/workspaces/${id}`);
+
+export const createWorkspace = (cfg: ApiConfig, payload: { name: string; slug: string; plan: string; owner_email?: string }) =>
+  request<{ ok: boolean; workspace?: Workspace }>(cfg, '/workspaces', { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateWorkspace = (cfg: ApiConfig, id: string | number, payload: Partial<Workspace>) =>
+  request<{ ok: boolean; workspace?: Workspace }>(cfg, `/workspaces/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+
+export const deleteWorkspace = (cfg: ApiConfig, id: string | number) =>
+  request<{ ok: boolean }>(cfg, `/workspaces/${id}`, { method: 'DELETE' });
+
+// ── Brands ────────────────────────────────────────────────────────────────────
+
+export interface Brand {
+  id: string | number;
+  name: string;
+  slug?: string;
+  logo_url?: string;
+  tone?: string;
+  hashtags?: string;
+  language?: string;
+  audience?: string;
+  status?: string;
+  [k: string]: unknown;
+}
+
+export const fetchBrands = (cfg: ApiConfig, workspaceId: string | number) =>
+  request<{ brands: Brand[] }>(cfg, `/workspaces/${workspaceId}/brands`);
+
+export const createBrand = (cfg: ApiConfig, workspaceId: string | number, payload: Partial<Brand>) =>
+  request<{ ok: boolean; brand?: Brand }>(cfg, `/workspaces/${workspaceId}/brands`, { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateBrand = (cfg: ApiConfig, id: string | number, payload: Partial<Brand>) =>
+  request<{ ok: boolean; brand?: Brand }>(cfg, `/brands/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+
+export const deleteBrand = (cfg: ApiConfig, id: string | number) =>
+  request<{ ok: boolean }>(cfg, `/brands/${id}`, { method: 'DELETE' });
+
+// ── Social Accounts ───────────────────────────────────────────────────────────
+
+export interface SocialAccount {
+  id: string | number;
+  platform: string;
+  account_name?: string;
+  status?: string;
+  health?: string;
+  last_checked?: string;
+  [k: string]: unknown;
+}
+
+export const fetchSocialAccounts = (cfg: ApiConfig, workspaceId: string | number) =>
+  request<{ accounts: SocialAccount[] }>(cfg, `/workspaces/${workspaceId}/social-accounts`);
+
+export const createSocialAccount = (cfg: ApiConfig, workspaceId: string | number, payload: Record<string, unknown>) =>
+  request<{ ok: boolean; account?: SocialAccount }>(cfg, `/workspaces/${workspaceId}/social-accounts`, { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateSocialAccount = (cfg: ApiConfig, id: string | number, payload: Record<string, unknown>) =>
+  request<{ ok: boolean; account?: SocialAccount }>(cfg, `/social-accounts/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+
+export const deleteSocialAccount = (cfg: ApiConfig, id: string | number) =>
+  request<{ ok: boolean }>(cfg, `/social-accounts/${id}`, { method: 'DELETE' });
+
+export const healthCheckSocialAccount = (cfg: ApiConfig, id: string | number) =>
+  request<{ ok: boolean; healthy?: boolean; message?: string }>(cfg, `/social-accounts/${id}/health-check`, { method: 'POST' });
+
+// ── AI Profiles ───────────────────────────────────────────────────────────────
+
+export interface AIProfile {
+  id: string | number;
+  name: string;
+  tone?: string;
+  expertise?: string;
+  complexity?: string;
+  emoji_level?: string;
+  writing_style?: string;
+  system_prompt_override?: string;
+  [k: string]: unknown;
+}
+
+export const fetchAIProfiles = (cfg: ApiConfig, workspaceId: string | number) =>
+  request<{ profiles: AIProfile[] }>(cfg, `/workspaces/${workspaceId}/ai-profiles`);
+
+export const createAIProfile = (cfg: ApiConfig, workspaceId: string | number, payload: Partial<AIProfile>) =>
+  request<{ ok: boolean; profile?: AIProfile }>(cfg, `/workspaces/${workspaceId}/ai-profiles`, { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateAIProfile = (cfg: ApiConfig, id: string | number, payload: Partial<AIProfile>) =>
+  request<{ ok: boolean; profile?: AIProfile }>(cfg, `/ai-profiles/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+
+export const deleteAIProfile = (cfg: ApiConfig, id: string | number) =>
+  request<{ ok: boolean }>(cfg, `/ai-profiles/${id}`, { method: 'DELETE' });
+
+// ── Knowledge Base ────────────────────────────────────────────────────────────
+
+export interface KnowledgeDoc {
+  id: string | number;
+  title?: string;
+  content?: string;
+  doc_type?: string;
+  tags?: string;
+  created_at?: string;
+  [k: string]: unknown;
+}
+
+export const fetchKnowledgeDocs = (cfg: ApiConfig, brandId: string | number) =>
+  request<{ documents: KnowledgeDoc[] }>(cfg, `/brands/${brandId}/knowledge`);
+
+export const createKnowledgeDoc = (cfg: ApiConfig, brandId: string | number, payload: { content: string; doc_type: string; tags?: string; title?: string }) =>
+  request<{ ok: boolean; document?: KnowledgeDoc }>(cfg, `/brands/${brandId}/knowledge`, { method: 'POST', body: JSON.stringify(payload) });
+
+export const searchKnowledge = (cfg: ApiConfig, brandId: string | number, query: string, topK = 5) =>
+  request<{ results: KnowledgeDoc[] }>(cfg, `/brands/${brandId}/knowledge/search`, { method: 'POST', body: JSON.stringify({ query, top_k: topK }) });
+
+export const deleteKnowledgeDoc = (cfg: ApiConfig, id: string | number) =>
+  request<{ ok: boolean }>(cfg, `/knowledge/${id}`, { method: 'DELETE' });
+
+// ── Guardian / Security ───────────────────────────────────────────────────────
+
+export interface GuardianIssue {
+  id: string | number;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  title?: string;
+  repo?: string;
+  status?: string;
+  [k: string]: unknown;
+}
+
+export const fetchGuardianStatus = (cfg: ApiConfig) =>
+  request<{ last_scan?: string; total_findings?: number; critical?: number; high?: number; medium?: number; low?: number }>(cfg, '/guardian/status');
+
+export const fetchGuardianIssues = (cfg: ApiConfig, severity?: string) => {
+  const params = new URLSearchParams();
+  if (severity) params.append('severity', severity);
+  return request<{ issues: GuardianIssue[] }>(cfg, `/guardian/issues?${params}`);
+};
+
+export interface AuditLogEntry {
+  id: string | number;
+  action?: string;
+  user?: string;
+  resource?: string;
+  status?: string;
+  created_at?: string;
+  [k: string]: unknown;
+}
+
+export const fetchAuditLogs = (cfg: ApiConfig, limit = 50) =>
+  request<{ logs: AuditLogEntry[] }>(cfg, `/audit-logs?limit=${limit}`);
+
+// ── API Keys ──────────────────────────────────────────────────────────────────
+
+export interface ApiKeyEntry {
+  id: string | number;
+  label: string;
+  prefix?: string;
+  created_at?: string;
+  last_used?: string;
+  status?: string;
+  [k: string]: unknown;
+}
+
+export const fetchApiKeys = (cfg: ApiConfig) =>
+  request<{ keys: ApiKeyEntry[] }>(cfg, '/keys');
+
+export const generateApiKeyLabeled = (cfg: ApiConfig, label: string) =>
+  request<GeneratedKey>(cfg, '/keys/generate', { method: 'POST', body: JSON.stringify({ label }) });
+
+export const revokeApiKey = (cfg: ApiConfig, id: string | number) =>
+  request<{ ok: boolean }>(cfg, `/keys/${id}`, { method: 'DELETE' });
+
+// ── Feature toggles ───────────────────────────────────────────────────────────
+
+export interface FeaturesPayload {
+  features: Record<string, boolean>;
+}
+
+export const fetchFeatures = (cfg: ApiConfig) =>
+  request<FeaturesPayload>(cfg, '/features');
+
+export const toggleFeature = (cfg: ApiConfig, feature: string, enabled: boolean) =>
+  request<{ ok: boolean }>(cfg, '/features/toggle', { method: 'POST', body: JSON.stringify({ feature, enabled }) });
+
+// ── Messenger ─────────────────────────────────────────────────────────────────
+
+export interface ConversationSummary {
+  sender_id: string;
+  name?: string;
+  avatar?: string;
+  last_message?: string;
+  time?: string;
+  unread?: number;
+  sentiment?: string;
+  [k: string]: unknown;
+}
+
+export interface MessageEntry {
+  id: string | number;
+  sender_id: string;
+  text: string;
+  is_me?: boolean;
+  time?: string;
+  [k: string]: unknown;
+}
+
+export const fetchConversations = (cfg: ApiConfig, limit = 50) =>
+  request<{ conversations: ConversationSummary[] }>(cfg, `/messages?limit=${limit}`);
+
+export const fetchConversation = (cfg: ApiConfig, senderId: string) =>
+  request<{ messages: MessageEntry[] }>(cfg, `/messages/${senderId}`);
+
+export const sendMessageReply = (cfg: ApiConfig, recipientId: string, text: string) =>
+  request<{ ok: boolean }>(cfg, '/messages/reply', { method: 'POST', body: JSON.stringify({ recipient_id: recipientId, text }) });

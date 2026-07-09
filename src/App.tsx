@@ -34,6 +34,9 @@ const Marketplace       = lazy(() => import('./pages/Marketplace'));
 const Tenants           = lazy(() => import('./pages/Tenants'));
 const Monitoring        = lazy(() => import('./pages/Monitoring'));
 const AIChat            = lazy(() => import('./pages/AIChat'));
+const Brands            = lazy(() => import('./pages/Brands'));
+const AIProfiles        = lazy(() => import('./pages/AIProfiles'));
+const Features          = lazy(() => import('./pages/Features'));
 
 /**
  * Wraps each route in an ErrorBoundary + Suspense so that:
@@ -93,6 +96,9 @@ export default function App() {
             <Route path="audit-logs" element={<Page name="Audit Logs">    <AuditLogs />        </Page>} />
             <Route path="marketplace" element={<Page name="Marketplace"> <Marketplace />        </Page>} />
             <Route path="tenants"   element={<Page name="Tenants">         <Tenants />          </Page>} />
+            <Route path="brands"    element={<Page name="Brands">          <Brands />           </Page>} />
+            <Route path="ai-profiles" element={<Page name="AI Profiles"> <AIProfiles />        </Page>} />
+            <Route path="features"  element={<Page name="Features">        <Features />         </Page>} />
             <Route path="monitoring" element={<Page name="Monitoring">    <Monitoring />        </Page>} />
             <Route path="ai-chat"   element={<Page name="AI Chat">         <AIChat />          </Page>} />
             <Route path="engine"    element={<Page name="AI Engine">        <AIEngine />         </Page>} />

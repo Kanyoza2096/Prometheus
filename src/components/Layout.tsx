@@ -43,6 +43,8 @@ import {
   WifiOff,
   LayoutGrid,
   Bot,
+  Palette,
+  ToggleLeft,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import CommandTerminal from './CommandTerminal';
@@ -77,6 +79,9 @@ const NAV_ITEMS = [
   { to: '/audit-logs',       icon: FileClock,       label: 'Audit Logs',      group: 'admin' },
   { to: '/marketplace',      icon: Store,           label: 'Marketplace',     group: 'admin' },
   { to: '/tenants',          icon: Building2,       label: 'Tenants',         group: 'admin' },
+  { to: '/brands',           icon: Palette,         label: 'Brands',          group: 'data' },
+  { to: '/ai-profiles',      icon: Bot,             label: 'AI Profiles',     group: 'data' },
+  { to: '/features',         icon: ToggleLeft,      label: 'Feature Toggles', group: 'admin' },
   { to: '/monitoring',       icon: Cpu,             label: 'Monitoring',      group: 'admin' },
   { to: '/ai-chat',          icon: MessageCircle,   label: 'AI Chat',         group: 'admin' },
   { to: '/settings',         icon: Settings,        label: 'Settings',        group: 'admin' },

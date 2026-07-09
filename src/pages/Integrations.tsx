@@ -1,116 +1,107 @@
 import React, { useState, useEffect } from 'react';
-import { fetchIntegrations } from '../lib/api';
-import { useStore } from '../store/useStore';
-import { motion } from 'motion/react';
-import { 
-  Link, CheckCircle, XCircle, AlertCircle, Settings, Plus, RefreshCw, 
-  FileText, Activity, Facebook, MessageCircle, Send, Instagram, Linkedin, 
-  Twitter, MessageSquare, Hash, Mail, Database, Cloud, Calendar, Github, 
-  Webhook, Code 
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  Link, CheckCircle, XCircle, AlertCircle, Plus, RefreshCw, Trash2, Edit2, Loader2, X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useStore } from '../store/useStore';
+import { fetchWorkspaces, fetchSocialAccounts, createSocialAccount, updateSocialAccount, deleteSocialAccount, healthCheckSocialAccount, type Workspace, type SocialAccount } from '../lib/api';
 
-type Status = 'connected' | 'degraded' | 'offline';
-
-interface Integration {
-  name: string;
-  category: string;
-  status: Status;
-  latency: number;
-  lastSync: string;
-  icon: React.ElementType;
-  color: string;
-}
-
-const integrations: Integration[] = [
-  { name: 'Facebook', category: 'Social Media', status: 'connected', latency: 45, lastSync: '2m ago', icon: Facebook, color: '#1877F2' },
-  { name: 'WhatsApp', category: 'Social Media', status: 'connected', latency: 78, lastSync: '5m ago', icon: MessageCircle, color: '#25D366' },
-  { name: 'Telegram', category: 'Social Media', status: 'connected', latency: 120, lastSync: '10m ago', icon: Send, color: '#229ED9' },
-  { name: 'Instagram', category: 'Social Media', status: 'degraded', latency: 450, lastSync: '15m ago', icon: Instagram, color: '#E4405F' },
-  { name: 'LinkedIn', category: 'Social Media', status: 'connected', latency: 89, lastSync: '12m ago', icon: Linkedin, color: '#0A66C2' },
-  { name: 'Twitter', category: 'Social Media', status: 'offline', latency: 0, lastSync: '1h ago', icon: Twitter, color: '#1DA1F2' },
-  { name: 'Discord', category: 'Social Media', status: 'connected', latency: 34, lastSync: '1m ago', icon: MessageSquare, color: '#5865F2' },
-  { name: 'Slack', category: 'Messaging', status: 'connected', latency: 56, lastSync: '3m ago', icon: Hash, color: '#4A154B' },
-  { name: 'Email (SMTP)', category: 'Messaging', status: 'connected', latency: 23, lastSync: 'Just now', icon: Mail, color: '#EA4335' },
-  { name: 'Supabase', category: 'Databases', status: 'connected', latency: 15, lastSync: 'Active', icon: Database, color: '#3ECF8E' },
-  { name: 'PostgreSQL', category: 'Databases', status: 'connected', latency: 12, lastSync: 'Active', icon: Database, color: '#336791' },
-  { name: 'Redis', category: 'Databases', status: 'connected', latency: 8, lastSync: 'Active', icon: Database, color: '#DC382D' },
-  { name: 'Google Drive', category: 'Cloud', status: 'connected', latency: 145, lastSync: '20m ago', icon: Cloud, color: '#4285F4' },
-  { name: 'Google Calendar', category: 'Cloud', status: 'connected', latency: 167, lastSync: '30m ago', icon: Calendar, color: '#4285F4' },
-  { name: 'Google Docs', category: 'Cloud', status: 'connected', latency: 189, lastSync: '45m ago', icon: FileText, color: '#4285F4' },
-  { name: 'GitHub', category: 'DevOps', status: 'connected', latency: 234, lastSync: '1h ago', icon: Github, color: '#181717' },
-  { name: 'Webhooks', category: 'Webhooks', status: 'connected', latency: 45, lastSync: 'Active', icon: Webhook, color: '#6366F1' },
-  { name: 'REST APIs', category: 'DevOps', status: 'connected', latency: 67, lastSync: 'Active', icon: Code, color: '#10B981' },
-];
-
-const categories = ['All', 'Social Media', 'Databases', 'Messaging', 'Cloud', 'DevOps', 'Webhooks'];
-
+const PLATFORMS = ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube', 'whatsapp', 'telegram', 'discord', 'slack'];
 
 export default function Integrations() {
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [data, setData] = useState<Integration[]>(integrations);
-  const [loading, setLoading] = useState(true);
-  const { restEndpoint, masterToken } = useStore();
+  const { restEndpoint, masterToken, triggerNotification } = useStore();
+  const cfg = { restEndpoint, masterToken };
+  const qc = useQueryClient();
 
-  useEffect(() => {
-    let mounted = true;
-    fetchIntegrations({ restEndpoint, masterToken })
-      .then(res => {
-        if (mounted && res && res.ok && res.integrations) {
-          // Map backend integration to local with icons (this is a simplified mapping logic for demo)
-          const liveData = res.integrations.map((live: any) => {
-            const existing = integrations.find(i => i.name.toLowerCase() === live.name.toLowerCase());
-            return {
-              name: live.name,
-              category: existing ? existing.category : 'Other',
-              status: live.status === 'active' ? 'connected' : 'offline',
-              latency: live.latency || 0,
-              lastSync: live.lastSync || 'Just now',
-              icon: existing ? existing.icon : Webhook,
-              color: existing ? existing.color : '#6366F1'
-            } as Integration;
-          });
-          setData(liveData.length > 0 ? liveData : integrations);
-        } else {
-           if (mounted) setData(integrations);
-        }
-      })
-      .catch(() => {
-        if (mounted) setData(integrations);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => { mounted = false; };
-  }, [restEndpoint, masterToken]);
+  const { data: wsData } = useQuery({ queryKey: ['workspaces', restEndpoint], queryFn: () => fetchWorkspaces(cfg), retry: 1 });
+  const workspaces: Workspace[] = wsData?.workspaces ?? [];
+  const [workspaceId, setWorkspaceId] = useState<string | number | null>(null);
+  useEffect(() => { if (!workspaceId && workspaces.length > 0) setWorkspaceId(workspaces[0].id); }, [workspaces, workspaceId]);
 
-  const filteredIntegrations = data.filter(int => 
-    selectedCategory === 'All' || int.category === selectedCategory
-  );
-  
-  const connectedCount = data.filter(i => i.status === 'connected').length;
-  const degradedCount = data.filter(i => i.status === 'degraded').length;
-  const offlineCount = data.filter(i => i.status === 'offline').length;
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['social-accounts', restEndpoint, workspaceId],
+    queryFn: () => fetchSocialAccounts(cfg, workspaceId as string | number),
+    enabled: !!workspaceId,
+    retry: 1,
+  });
+  const accounts: SocialAccount[] = data?.accounts ?? [];
+
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<SocialAccount | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<SocialAccount | null>(null);
+  const [form, setForm] = useState({ platform: 'facebook', account_name: '', access_token: '' });
+
+  const resetForm = () => { setForm({ platform: 'facebook', account_name: '', access_token: '' }); setEditing(null); setShowForm(false); };
+
+  const createMut = useMutation({
+    mutationFn: () => createSocialAccount(cfg, workspaceId as string | number, form),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['social-accounts', restEndpoint, workspaceId] });
+      triggerNotification({ title: 'Account Connected', message: `${form.platform} account added.`, type: 'success' });
+      resetForm();
+    },
+    onError: (err: any) => triggerNotification({ title: 'Connect Failed', message: err?.message || 'Could not connect account.', type: 'warning' }),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: () => updateSocialAccount(cfg, (editing as SocialAccount).id, form),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['social-accounts', restEndpoint, workspaceId] });
+      triggerNotification({ title: 'Account Updated', message: `${form.platform} account saved.`, type: 'success' });
+      resetForm();
+    },
+    onError: (err: any) => triggerNotification({ title: 'Update Failed', message: err?.message || 'Could not update account.', type: 'warning' }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string | number) => deleteSocialAccount(cfg, id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['social-accounts', restEndpoint, workspaceId] });
+      triggerNotification({ title: 'Account Removed', message: `${confirmDelete?.platform} account disconnected.`, type: 'info' });
+      setConfirmDelete(null);
+    },
+    onError: (err: any) => triggerNotification({ title: 'Delete Failed', message: err?.message || 'Could not remove account.', type: 'warning' }),
+  });
+
+  const healthMut = useMutation({
+    mutationFn: (id: string | number) => healthCheckSocialAccount(cfg, id),
+    onSuccess: (res, id) => {
+      qc.invalidateQueries({ queryKey: ['social-accounts', restEndpoint, workspaceId] });
+      triggerNotification({ title: 'Health Check', message: res.message || (res.healthy ? 'Connection healthy.' : 'Connection issue detected.'), type: res.healthy ? 'success' : 'warning' });
+    },
+    onError: (err: any) => triggerNotification({ title: 'Health Check Failed', message: err?.message || 'Could not check connection.', type: 'warning' }),
+  });
+
+  const openEdit = (a: SocialAccount) => {
+    setEditing(a);
+    setForm({ platform: a.platform, account_name: a.account_name || '', access_token: '' });
+    setShowForm(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.account_name.trim()) {
+      triggerNotification({ title: 'Validation Error', message: 'Account name is required.', type: 'warning' });
+      return;
+    }
+    if (editing) updateMut.mutate(); else createMut.mutate();
+  };
+
+  const connectedCount = accounts.filter(a => a.status === 'connected' || a.health === 'healthy').length;
+  const degradedCount = accounts.filter(a => a.health === 'degraded').length;
+  const offlineCount = accounts.filter(a => a.status === 'offline' || a.health === 'unhealthy').length;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6 pb-20 md:pb-0"
-    >
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-20 md:pb-0">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-2">
+        <div>
           <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center">
             <Link className="w-8 h-8 mr-3 text-brand-primary" />
             Integration Center
           </h1>
-          <p className="text-brand-text-muted text-sm font-mono mt-1">
-            MANAGE CONNECTED SERVICES & PIPELINES
-          </p>
+          <p className="text-brand-text-muted text-sm font-mono mt-1">CONNECTED SOCIAL ACCOUNTS</p>
           <div className="flex flex-wrap items-center gap-3 mt-4">
             <div className="flex items-center text-xs font-mono bg-brand-surface border border-brand-border px-3 py-1.5 rounded-full text-brand-text">
               <CheckCircle className="w-3.5 h-3.5 text-brand-success mr-1.5" />
@@ -129,153 +120,166 @@ export default function Integrations() {
               </div>
             )}
           </div>
-        </motion.div>
-        <motion.button
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="bg-brand-primary text-white shadow-glow-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap self-start hover:bg-brand-primary/90 transition-colors"
-         onClick={() => alert('Feature coming soon')}>
-          <Plus className="w-4 h-4" />
-          Connect New Integration
-        </motion.button>
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.2 }}
-        className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
-      >
-        {categories.map((category, idx) => (
+        </div>
+        <div className="flex items-center gap-3">
+          <select
+            value={workspaceId ?? ''}
+            onChange={e => setWorkspaceId(e.target.value)}
+            className="px-3 py-2 bg-brand-surface border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary"
+          >
+            {workspaces.length === 0 && <option value="">No workspaces</option>}
+            {workspaces.map(ws => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
+          </select>
           <motion.button
-            key={category}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.25 + idx * 0.03 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setSelectedCategory(category)}
-            className={cn(
-              'px-4 py-2 rounded-xl text-sm font-bold transition-colors whitespace-nowrap',
-              selectedCategory === category
-                ? 'bg-brand-primary text-white shadow-glow-primary'
-                : 'bg-brand-surface border border-brand-border text-brand-text hover:bg-brand-elevated'
-            )}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={!workspaceId}
+            className="bg-brand-primary text-white shadow-glow-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap hover:bg-brand-primary/90 transition-colors disabled:opacity-50"
+            onClick={() => { resetForm(); setShowForm(v => !v); }}
           >
-            {category}
+            <Plus className="w-4 h-4" />
+            Connect Account
           </motion.button>
-        ))}
-      </motion.div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredIntegrations.map((integration, idx) => (
-          <motion.div
-            key={integration.name}
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: 0.35 + (idx % 8) * 0.04 }}
-            className="bg-brand-surface border border-brand-border rounded-2xl p-5 hover:border-brand-primary/30 transition-all flex flex-col group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <motion.div
-                  whileHover={{ rotate: 10, scale: 1.1 }}
-                  className="w-12 h-12 rounded-xl flex items-center justify-center relative overflow-hidden"
-                  style={{ backgroundColor: integration.color + '15' }}
-                >
-                  <integration.icon 
-                    className="w-6 h-6 z-10" 
-                    style={{ color: integration.color }} 
-                  />
-                  <div 
-                    className="absolute inset-0 opacity-20"
-                    style={{ backgroundColor: integration.color }}
-                  />
-                </motion.div>
-                <div>
-                  <h3 className="text-sm font-bold text-brand-text leading-tight">{integration.name}</h3>
-                  <span className="text-[10px] uppercase tracking-wider font-mono text-brand-text-muted">
-                    {integration.category}
-                  </span>
-                </div>
-              </div>
-              <div title={integration.status} className="mt-1">
-                {integration.status === 'connected' && (
-                  <CheckCircle className="w-5 h-5 text-brand-success" />
-                )}
-                {integration.status === 'degraded' && (
-                  <AlertCircle className="w-5 h-5 text-brand-warning" />
-                )}
-                {integration.status === 'offline' && (
-                  <XCircle className="w-5 h-5 text-brand-danger" />
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 mb-5 flex-1">
-              <div className="bg-brand-bg rounded-lg p-2 border border-brand-border">
-                <span className="block text-[10px] text-brand-text-muted font-mono mb-1">LATENCY</span>
-                <div className="flex items-center gap-1.5">
-                  <Activity className="w-3 h-3 text-brand-text-muted" />
-                  <span className={cn(
-                    "text-xs font-bold font-mono",
-                    integration.status === 'offline' ? 'text-brand-text-muted' :
-                    integration.latency < 100 ? 'text-brand-success' :
-                    integration.latency < 500 ? 'text-brand-warning' :
-                    'text-brand-danger'
-                  )}>
-                    {integration.status === 'offline' ? '--' : `${integration.latency}ms`}
-                  </span>
-                </div>
-              </div>
-              <div className="bg-brand-bg rounded-lg p-2 border border-brand-border">
-                <span className="block text-[10px] text-brand-text-muted font-mono mb-1">LAST SYNC</span>
-                <span className="text-xs font-bold text-brand-text font-mono truncate block">
-                  {integration.lastSync}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 mt-auto">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={cn(
-                  "flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5",
-                  integration.status === 'offline' || integration.status === 'degraded'
-                    ? "bg-brand-elevated text-brand-text border border-brand-border hover:bg-brand-border/50"
-                    : "bg-brand-elevated text-brand-text hover:bg-brand-border/30 border border-transparent"
-                )}
-               onClick={() => alert('Feature coming soon')}>
-                <Settings className="w-3.5 h-3.5" />
-                <span>Configure</span>
-              </motion.button>
-              
-              {(integration.status === 'degraded' || integration.status === 'offline') && (
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 border border-brand-primary/20"
-                 onClick={() => alert('Feature coming soon')}>
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Reconnect</span>
-                </motion.button>
-              )}
-              
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                title="View Logs"
-                className="py-2 px-3 rounded-lg bg-brand-bg border border-brand-border text-brand-text-muted hover:text-brand-text hover:border-brand-text-muted transition-colors flex items-center justify-center"
-               onClick={() => alert('Feature coming soon')}>
-                <FileText className="w-3.5 h-3.5" />
-              </motion.button>
-            </div>
-          </motion.div>
-        ))}
+        </div>
       </div>
+
+      <AnimatePresence>
+        {showForm && (
+          <motion.form
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            onSubmit={handleSubmit}
+            className="p-5 bg-brand-surface border border-brand-border rounded-2xl space-y-4 overflow-hidden"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-brand-text">{editing ? 'Edit Account' : 'Connect New Account'}</h3>
+              <button type="button" onClick={resetForm}><X className="w-4 h-4 text-brand-text-muted" /></button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-[10px] font-mono font-bold uppercase text-brand-text-muted mb-1">Platform</label>
+                <select value={form.platform} onChange={e => setForm(f => ({ ...f, platform: e.target.value }))} className="w-full px-3 py-2.5 bg-brand-elevated border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary capitalize">
+                  {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold uppercase text-brand-text-muted mb-1">Account Name</label>
+                <input value={form.account_name} onChange={e => setForm(f => ({ ...f, account_name: e.target.value }))} className="w-full px-3 py-2 bg-brand-elevated border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold uppercase text-brand-text-muted mb-1">Access Token</label>
+                <input type="password" value={form.access_token} onChange={e => setForm(f => ({ ...f, access_token: e.target.value }))} placeholder={editing ? 'Leave blank to keep' : ''} className="w-full px-3 py-2 bg-brand-elevated border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="px-4 py-2 bg-brand-surface hover:bg-brand-elevated border border-brand-border text-brand-text-muted rounded-xl text-sm font-semibold" onClick={resetForm}>Cancel</button>
+              <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl text-sm font-semibold shadow-glow-primary disabled:opacity-50 flex items-center gap-2">
+                {(createMut.isPending || updateMut.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
+                {editing ? 'Save Changes' : 'Connect'}
+              </button>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
+
+      {!workspaceId && (
+        <div className="py-16 text-center text-brand-text-muted font-mono text-xs uppercase border border-dashed border-brand-border rounded-2xl">
+          Create a workspace first to connect accounts.
+        </div>
+      )}
+
+      {workspaceId && isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-48 bg-brand-surface/60 border border-brand-border rounded-2xl animate-pulse" />)}
+        </div>
+      )}
+
+      {workspaceId && isError && (
+        <div className="py-16 text-center text-brand-danger font-mono text-sm flex flex-col items-center gap-2">
+          <AlertCircle className="w-6 h-6" />
+          Failed to load connected accounts.
+          <button onClick={() => refetch()} className="mt-2 px-4 py-1.5 bg-brand-elevated rounded-lg text-xs font-bold">Retry</button>
+        </div>
+      )}
+
+      {workspaceId && !isLoading && !isError && accounts.length === 0 && (
+        <div className="py-16 text-center text-brand-text-muted font-mono text-xs uppercase border border-dashed border-brand-border rounded-2xl">
+          No accounts connected yet.
+        </div>
+      )}
+
+      {workspaceId && !isLoading && !isError && accounts.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {accounts.map((a, idx) => {
+            const healthy = a.health === 'healthy' || a.status === 'connected';
+            const degraded = a.health === 'degraded';
+            return (
+              <motion.div
+                key={a.id}
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 0.04 * idx }}
+                className="bg-brand-surface border border-brand-border rounded-2xl p-5 hover:border-brand-primary/30 transition-all flex flex-col"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-brand-text capitalize leading-tight">{a.platform}</h3>
+                    <span className="text-[10px] uppercase tracking-wider font-mono text-brand-text-muted">{a.account_name || 'Unnamed'}</span>
+                  </div>
+                  <div title={a.health || a.status || ''}>
+                    {healthy && <CheckCircle className="w-5 h-5 text-brand-success" />}
+                    {degraded && <AlertCircle className="w-5 h-5 text-brand-warning" />}
+                    {!healthy && !degraded && <XCircle className="w-5 h-5 text-brand-danger" />}
+                  </div>
+                </div>
+                <div className="bg-brand-bg rounded-lg p-2 border border-brand-border mb-4">
+                  <span className="block text-[10px] text-brand-text-muted font-mono mb-1">LAST CHECKED</span>
+                  <span className="text-xs font-bold text-brand-text font-mono truncate block">{a.last_checked || 'Never'}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-auto">
+                  <button
+                    disabled={healthMut.isPending && healthMut.variables === a.id}
+                    className="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 border border-brand-primary/20 disabled:opacity-50"
+                    onClick={() => healthMut.mutate(a.id)}
+                  >
+                    {healthMut.isPending && healthMut.variables === a.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    <span>Check</span>
+                  </button>
+                  <button
+                    className="py-2 px-3 rounded-lg bg-brand-bg border border-brand-border text-brand-text-muted hover:text-brand-text hover:border-brand-text-muted transition-colors flex items-center justify-center"
+                    onClick={() => openEdit(a)}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    className="py-2 px-3 rounded-lg bg-brand-bg border border-brand-border text-brand-text-muted hover:text-brand-danger hover:border-brand-danger/30 transition-colors flex items-center justify-center"
+                    onClick={() => setConfirmDelete(a)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setConfirmDelete(null)}>
+          <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-brand-text mb-2">Disconnect Account?</h3>
+            <p className="text-xs text-brand-text-muted mb-5 capitalize">This will disconnect the {confirmDelete.platform} account "{confirmDelete.account_name}".</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 bg-brand-elevated border border-brand-border text-brand-text-muted rounded-xl text-sm font-semibold">Cancel</button>
+              <button onClick={() => deleteMut.mutate(confirmDelete.id)} disabled={deleteMut.isPending} className="px-4 py-2 bg-brand-danger text-white rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
+                {deleteMut.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                Disconnect
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

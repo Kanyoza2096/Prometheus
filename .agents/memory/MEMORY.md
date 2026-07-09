@@ -1,0 +1,1 @@
+- [Kanyoza CRUD page pattern](kanyoza-crud-pages.md) — workspace/brand-scoped resource pages use local dropdown state, not global store, for scoping.
