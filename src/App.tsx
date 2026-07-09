@@ -105,6 +105,7 @@ export default function App() {
             <Route path="payloads"  element={<Page name="Payload Inspector"><PayloadInspector /> </Page>} />
             <Route path="api"       element={<Page name="API Analytics">    <ApiAnalytics />     </Page>} />
             <Route path="prometheus"element={<Page name="Prometheus">       <PrometheusMetrics /></Page>} />
+            <Route path="social-accounts" element={<Page name="Social Accounts"><SocialAccounts /></Page>} />
             <Route path="guardian"  element={<Page name="Guardian">         <Guardian />         </Page>} />
             <Route path="settings"  element={<Page name="Settings">         <Settings />         </Page>} />
             <Route path="*"         element={<Navigate to="/" replace />} />
