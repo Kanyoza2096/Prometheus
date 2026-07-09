@@ -38,6 +38,7 @@ const Brands            = lazy(() => import('./pages/Brands'));
 const AIProfiles        = lazy(() => import('./pages/AIProfiles'));
 const Features          = lazy(() => import('./pages/Features'));
 const SocialAccounts    = lazy(() => import('./pages/SocialAccounts'));
+const Notifications     = lazy(() => import('./pages/Notifications'));
 
 /**
  * Wraps each route in an ErrorBoundary + Suspense so that:
@@ -108,6 +109,7 @@ export default function App() {
             <Route path="prometheus"element={<Page name="Prometheus">       <PrometheusMetrics /></Page>} />
             <Route path="social-accounts" element={<Page name="Social Accounts"><SocialAccounts /></Page>} />
             <Route path="guardian"  element={<Page name="Guardian">         <Guardian />         </Page>} />
+            <Route path="notifications" element={<Page name="Notifications"><Notifications />    </Page>} />
             <Route path="settings"  element={<Page name="Settings">         <Settings />         </Page>} />
             <Route path="*"         element={<Navigate to="/" replace />} />
           </Route>

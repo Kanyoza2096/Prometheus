@@ -674,3 +674,159 @@ export const fetchConversation = (cfg: ApiConfig, senderId: string) =>
 
 export const sendMessageReply = (cfg: ApiConfig, recipientId: string, text: string) =>
   request<{ ok: boolean }>(cfg, '/messages/reply', { method: 'POST', body: JSON.stringify({ recipient_id: recipientId, text }) });
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+export interface AnalyticsSummary {
+  total_posts?: number;
+  total_messages?: number;
+  active_users?: number;
+  api_calls?: number;
+  token_usage?: number;
+  engagement_rate?: number;
+  [k: string]: unknown;
+}
+
+export interface AnalyticsPerformance {
+  posts?: Array<{ date: string; count: number; reach?: number; [k: string]: unknown }>;
+  messages?: Array<{ date: string; count: number; [k: string]: unknown }>;
+  [k: string]: unknown;
+}
+
+export interface PostsPerformance {
+  posts?: Array<{ id: string | number; title?: string; reach?: number; likes?: number; comments?: number; shares?: number; [k: string]: unknown }>;
+  [k: string]: unknown;
+}
+
+export interface TokenUsage {
+  total_tokens?: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  by_day?: Array<{ date: string; tokens: number; [k: string]: unknown }>;
+  [k: string]: unknown;
+}
+
+export interface EngagementHeatmap {
+  heatmap?: Array<{ day: string; hours: number[] }>;
+  raw?: number[][];
+  [k: string]: unknown;
+}
+
+export const fetchAnalytics             = (cfg: ApiConfig) => request<AnalyticsSummary>(cfg, '/analytics');
+export const fetchAnalyticsPerformance  = (cfg: ApiConfig) => request<AnalyticsPerformance>(cfg, '/analytics/performance');
+export const fetchAnalyticsPostsPerf    = (cfg: ApiConfig) => request<PostsPerformance>(cfg, '/analytics/posts-performance');
+export const fetchAnalyticsTokenUsage   = (cfg: ApiConfig) => request<TokenUsage>(cfg, '/analytics/token-usage');
+export const fetchAnalyticsHeatmap      = (cfg: ApiConfig) => request<EngagementHeatmap>(cfg, '/analytics/engagement-heatmap');
+export const fetchMetricsPublic         = (cfg: ApiConfig) => request<MetricsPayload>(cfg, '/metrics/public');
+
+// ── Rate Limits ───────────────────────────────────────────────────────────────
+
+export interface RateLimitEntry {
+  id: string | number;
+  identifier?: string;
+  endpoint?: string;
+  limit?: number;
+  remaining?: number;
+  reset_at?: string;
+  blocked?: boolean;
+  [k: string]: unknown;
+}
+
+export const fetchRateLimits  = (cfg: ApiConfig) => request<{ limits: RateLimitEntry[] }>(cfg, '/rate-limits');
+export const unblockRateLimit = (cfg: ApiConfig, identifier: string) =>
+  request<{ ok: boolean }>(cfg, '/rate-limits/unblock', { method: 'POST', body: JSON.stringify({ identifier }) });
+
+// ── Tenants ───────────────────────────────────────────────────────────────────
+
+export interface TenantEntry {
+  id: string | number;
+  name?: string;
+  slug?: string;
+  plan?: string;
+  active?: boolean;
+  [k: string]: unknown;
+}
+
+export const fetchTenants  = (cfg: ApiConfig) => request<{ tenants: TenantEntry[] }>(cfg, '/tenants');
+export const switchTenant  = (cfg: ApiConfig, tenantId: string | number) =>
+  request<{ ok: boolean; tenant?: TenantEntry }>(cfg, '/tenants/switch', { method: 'POST', body: JSON.stringify({ tenant_id: tenantId }) });
+
+// ── Brand detail ──────────────────────────────────────────────────────────────
+
+export const fetchBrand = (cfg: ApiConfig, id: string | number) => request<{ brand: Brand }>(cfg, `/brands/${id}`);
+
+// ── Global Knowledge ──────────────────────────────────────────────────────────
+
+export const fetchAllKnowledge    = (cfg: ApiConfig) => request<{ documents: KnowledgeDoc[] }>(cfg, '/knowledge');
+export const createGlobalKnowledge = (cfg: ApiConfig, payload: Partial<KnowledgeDoc>) =>
+  request<{ ok: boolean; document?: KnowledgeDoc }>(cfg, '/knowledge', { method: 'POST', body: JSON.stringify(payload) });
+
+// ── Persona (direct /persona routes) ─────────────────────────────────────────
+
+export const fetchPersonaDirect  = (cfg: ApiConfig) => request<PersonaPayload>(cfg, '/persona');
+export const updatePersonaDirect = (cfg: ApiConfig, payload: Partial<PersonaPayload>) =>
+  request<{ ok: boolean }>(cfg, '/persona', { method: 'PUT', body: JSON.stringify(payload) });
+
+// ── System Health ─────────────────────────────────────────────────────────────
+
+export interface SystemHealthEntry {
+  service?: string;
+  status?: string;
+  latency_ms?: number;
+  message?: string;
+  [k: string]: unknown;
+}
+
+export const fetchSystemHealth = (cfg: ApiConfig) =>
+  request<{ status?: string; services?: SystemHealthEntry[]; uptime?: number; [k: string]: unknown }>(cfg, '/system/health');
+
+// ── Scan ──────────────────────────────────────────────────────────────────────
+
+export interface ScanHistoryEntry {
+  id: string | number;
+  started_at?: string;
+  completed_at?: string;
+  findings?: number;
+  status?: string;
+  [k: string]: unknown;
+}
+
+export const fetchScanHistory = (cfg: ApiConfig) =>
+  request<{ scans?: ScanHistoryEntry[]; last_scan?: ScanHistoryEntry }>(cfg, '/scan');
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export interface NotificationEntry {
+  id: string | number;
+  title?: string;
+  message?: string;
+  type?: string;
+  read?: boolean;
+  created_at?: string;
+  [k: string]: unknown;
+}
+
+export const fetchNotifications   = (cfg: ApiConfig) => request<{ notifications: NotificationEntry[] }>(cfg, '/notifications');
+export const markNotificationRead = (cfg: ApiConfig, id: string | number) =>
+  request<{ ok: boolean }>(cfg, `/notifications/${id}/read`, { method: 'POST' });
+
+// ── Workflow state & run ──────────────────────────────────────────────────────
+
+export interface WorkflowDefinition {
+  id: string | number;
+  name?: string;
+  status?: string;
+  last_run?: string;
+  schedule?: string;
+  enabled?: boolean;
+  [k: string]: unknown;
+}
+
+export const fetchWorkflowState = (cfg: ApiConfig) =>
+  request<{ workflow?: WorkflowDefinition; workflows?: WorkflowDefinition[]; [k: string]: unknown }>(cfg, '/workflow');
+
+export const runWorkflow = (cfg: ApiConfig, workflowId?: string | number) =>
+  request<{ ok: boolean; job_id?: string }>(cfg, '/workflow/run', {
+    method: 'POST',
+    body: JSON.stringify(workflowId ? { workflow_id: workflowId } : {}),
+  });

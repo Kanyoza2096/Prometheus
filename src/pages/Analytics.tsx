@@ -1,647 +1,317 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { 
-  BarChart3, TrendingUp, Users, MessageSquare, Activity, 
-  DollarSign, Bot, Globe, ThumbsUp, Calendar, ArrowUpRight, ArrowDownRight, ChevronDown, Shield
+import {
+  BarChart3, TrendingUp, Users, MessageSquare, Activity,
+  Bot, ThumbsUp, RefreshCw, AlertTriangle, Zap, Coins,
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, Legend
+  ResponsiveContainer, AreaChart, Area,
 } from 'recharts';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
-import MetricCard from '../components/MetricCard';
+import { Spinner } from '../components/Spinner';
+import {
+  fetchAnalytics, fetchAnalyticsPerformance, fetchAnalyticsPostsPerf,
+  fetchAnalyticsTokenUsage, fetchAnalyticsHeatmap, fetchMetrics,
+} from '../lib/api';
 
-const timeRanges = ['7 Days', '30 Days', '90 Days'];
-const hours = Array.from({ length: 24 }, (_, i) => i);
-const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const heatmapData = days.map(day => ({
-  day,
-  hours: Array.from({ length: 24 }, () => Math.random())
-}));
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const DAYS  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-function CustomTooltip({ active, payload, label }: any) {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-[#141A2E]/95 border border-brand-border p-3 rounded-xl shadow-xl font-mono text-xs">
-        <p className="text-brand-text-muted mb-1.5 font-bold">{label}</p>
-        {payload.map((item: any) => (
-          <div key={item.name} className="flex items-center gap-2 mb-1 last:mb-0">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
-            <span className="text-brand-text-muted">{item.name}:</span>
-            <span className="text-brand-text font-bold ml-auto">
-              {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
-            </span>
-          </div>
-        ))}
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color?: string; fill?: string }>; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-brand-surface border border-brand-border p-3 rounded-xl shadow-xl font-mono text-xs">
+      <p className="text-brand-text-muted mb-1.5 font-bold">{label}</p>
+      {payload.map(item => (
+        <div key={item.name} className="flex items-center gap-2 mb-1 last:mb-0">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+          <span className="text-brand-text-muted">{item.name}:</span>
+          <span className="text-brand-text font-bold ml-auto">{typeof item.value === 'number' ? item.value.toLocaleString() : item.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StatCard({ label, value, icon: Icon, color, trend, loading }: {
+  label: string; value: string | number; icon: React.ElementType;
+  color: string; trend?: string; loading?: boolean;
+}) {
+  return (
+    <div className="bg-brand-surface border border-brand-border rounded-2xl p-5">
+      <div className="flex items-start justify-between mb-3">
+        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', color.replace('text-', 'bg-') + '/20')}>
+          <Icon className={cn('w-5 h-5', color)} />
+        </div>
+        {trend && <span className="text-[10px] font-mono font-bold text-brand-success">{trend}</span>}
       </div>
-    );
-  }
-  return null;
+      <div className="text-2xl font-bold text-brand-text mb-1">
+        {loading ? <div className="h-7 w-20 bg-brand-elevated animate-pulse rounded" /> : value}
+      </div>
+      <div className="text-xs font-mono text-brand-text-muted uppercase tracking-wider">{label}</div>
+    </div>
+  );
 }
 
 export default function Analytics() {
-  const { stats, recentPosts } = useStore();
+  const { restEndpoint, masterToken } = useStore();
+  const cfg = { restEndpoint, masterToken };
 
-  const kpis = useMemo(() => {
-    return [
-      {
-        label: 'Active Users',
-        value: (stats?.activeUsers || 0).toLocaleString(),
-        icon: Users,
-        color: 'text-brand-primary',
-        isUp: true,
-        trend: '+12.3%',
-        type: 'reach' as const,
-      },
-      {
-        label: 'Posts Published',
-        value: (stats?.postsPublished || 0).toLocaleString(),
-        icon: MessageSquare,
-        color: 'text-brand-accent',
-        isUp: true,
-        trend: '+4.8%',
-        type: 'reach' as const,
-      },
-      {
-        label: 'Messages Today',
-        value: (stats?.messagesToday || 0).toLocaleString(),
-        icon: Bot,
-        color: 'text-brand-success',
-        isUp: true,
-        trend: '+8.2%',
-        type: 'ai' as const,
-      },
-      {
-        label: 'API Calls',
-        value: (stats?.apiCalls || 0).toLocaleString(),
-        icon: Activity,
-        color: 'text-brand-warning',
-        isUp: true,
-        trend: '+15.4%',
-        type: 'api' as const,
-      },
-      {
-        label: 'Guardian Issues',
-        value: (stats?.guardianIssues || 0).toLocaleString(),
-        icon: Shield,
-        color: 'text-brand-danger',
-        isUp: false,
-        trend: '-23%',
-        type: 'ai' as const,
-      },
-      {
-        label: 'Monthly Revenue',
-        value: `$${(stats?.revenueMonthly || 0).toLocaleString()}`,
-        icon: DollarSign,
-        color: 'text-brand-success',
-        isUp: true,
-        trend: '+5.1%',
-        type: 'revenue' as const,
-      },
-    ];
-  }, [stats]);
+  const summaryQ  = useQuery({ queryKey: ['analytics',          restEndpoint], queryFn: () => fetchAnalytics(cfg),            retry: 1, staleTime: 60_000 });
+  const perfQ     = useQuery({ queryKey: ['analytics-perf',     restEndpoint], queryFn: () => fetchAnalyticsPerformance(cfg), retry: 1, staleTime: 60_000 });
+  const postsQ    = useQuery({ queryKey: ['analytics-posts',    restEndpoint], queryFn: () => fetchAnalyticsPostsPerf(cfg),   retry: 1, staleTime: 60_000 });
+  const tokenQ    = useQuery({ queryKey: ['analytics-tokens',   restEndpoint], queryFn: () => fetchAnalyticsTokenUsage(cfg),  retry: 1, staleTime: 60_000 });
+  const heatmapQ  = useQuery({ queryKey: ['analytics-heatmap',  restEndpoint], queryFn: () => fetchAnalyticsHeatmap(cfg),    retry: 1, staleTime: 60_000 });
+  const metricsQ  = useQuery({ queryKey: ['metrics',            restEndpoint], queryFn: () => fetchMetrics(cfg),             retry: 1, staleTime: 60_000 });
 
-  const engagementData = useMemo(() => {
-    return Array.from({ length: 30 }, (_, i) => ({
-      date: `Day ${i + 1}`,
-      reach: (stats?.activeUsers || 500) * (10 + i % 5) + Math.floor(Math.random() * 1000),
-      likes: (stats?.postsPublished || 10) * 100 + i * 50 + Math.floor(Math.random() * 200),
-      comments: (stats?.messagesToday || 50) + i * 10 + Math.floor(Math.random() * 50),
-    }));
-  }, [stats]);
+  const [refetching, setRefetching] = useState(false);
+  const refetchAll = async () => {
+    setRefetching(true);
+    await Promise.all([summaryQ.refetch(), perfQ.refetch(), postsQ.refetch(), tokenQ.refetch(), heatmapQ.refetch(), metricsQ.refetch()]);
+    setRefetching(false);
+  };
 
-  const postPerformanceData = useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => ({
-      date: `Day ${i + 1}`,
-      published: Math.max(1, Math.floor((stats?.postsPublished || 10) / 14) + (i % 3)),
-      engagement: (stats?.messagesToday || 50) * 10 + i * 100,
-    }));
-  }, [stats]);
+  const s = summaryQ.data;
+  const perfPosts    = perfQ.data?.posts    ?? [];
+  const perfMessages = perfQ.data?.messages ?? [];
+  const topPosts     = postsQ.data?.posts   ?? [];
+  const tokenByDay   = tokenQ.data?.by_day  ?? [];
+  const metricsData  = (metricsQ.data?.metrics ?? []) as Array<{ name: string; value: number }>;
 
-  const platformData = [
-    { name: 'Facebook', value: 45, color: '#1877F2' },
-    { name: 'Twitter', value: 28, color: '#1DA1F2' },
-    { name: 'LinkedIn', value: 18, color: '#0A66C2' },
-    { name: 'Instagram', value: 9, color: '#E4405F' },
-  ];
+  // Build heatmap grid: normalise whatever shape the API returns
+  const heatGrid: number[][] = (() => {
+    const raw = heatmapQ.data;
+    if (!raw) return DAYS.map(() => Array(24).fill(0));
+    if (raw.heatmap) return DAYS.map((d, i) => raw.heatmap![i]?.hours ?? Array(24).fill(0));
+    if (raw.raw) return raw.raw as number[][];
+    return DAYS.map(() => Array(24).fill(0));
+  })();
+  const heatMax = Math.max(1, ...heatGrid.flat());
 
-  const bestPosts = useMemo(() => {
-    if (recentPosts && recentPosts.length > 0) {
-      return recentPosts.slice(0, 5).map((p, idx) => ({
-        id: idx + 1,
-        title: p.title || 'Untitled Post',
-        platform: p.platform || 'System',
-        engagement: 'High',
-        trend: 'up'
-      }));
-    }
-    return [
-      { id: 1, title: 'Q3 Enterprise Product Launch Announcem...', platform: 'Facebook', engagement: '14.2k', trend: 'up' },
-      { id: 2, title: 'How AI changes workflow automation for b...', platform: 'LinkedIn', engagement: '12.8k', trend: 'up' },
-      { id: 3, title: '5 tips to scale your backend architectur...', platform: 'Twitter', engagement: '9.4k', trend: 'up' },
-      { id: 4, title: 'Customer spotlight: Acme Corp scaling to...', platform: 'LinkedIn', engagement: '8.1k', trend: 'up' },
-      { id: 5, title: 'Join our upcoming webinar on security pr...', platform: 'Facebook', engagement: '7.6k', trend: 'down' },
-    ];
-  }, [recentPosts]);
-
-  const worstPosts = useMemo(() => {
-    if (recentPosts && recentPosts.length > 5) {
-      return recentPosts.slice(5, 10).map((p, idx) => ({
-        id: idx + 6,
-        title: p.title || 'Untitled Post',
-        platform: p.platform || 'System',
-        engagement: 'Low',
-        trend: 'down'
-      }));
-    }
-    return [
-      { id: 6, title: 'System maintenance scheduled for Friday.', platform: 'Twitter', engagement: '234', trend: 'down' },
-      { id: 7, title: 'Update on terms of service changes in 20...', platform: 'Facebook', engagement: '312', trend: 'down' },
-      { id: 8, title: 'Happy holidays from our engineering team', platform: 'Instagram', engagement: '458', trend: 'down' },
-      { id: 9, title: 'Quick poll: Tabs or spaces? Let us know!', platform: 'Twitter', engagement: '512', trend: 'up' },
-      { id: 10, title: 'We are hiring! Open positions in marketing', platform: 'LinkedIn', engagement: '645', trend: 'down' },
-    ];
-  }, [recentPosts]);
-
-  const tokenUsageData = useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => ({
-      date: `D${i + 1}`,
-      tokens: (stats?.apiCalls || 1000) * 50 + i * 1000,
-    }));
-  }, [stats]);
-
-  const fullPosts = useMemo(() => {
-    if (recentPosts && recentPosts.length > 0) {
-      return recentPosts.map((p, i) => {
-        const reach = Math.floor(Math.random() * 45000) + 5000;
-        const likes = Math.floor(Math.random() * 2000) + 100;
-        const comments = Math.floor(Math.random() * 500) + 10;
-        const shares = Math.floor(Math.random() * 300) + 5;
-        const rate = `${(((likes + comments + shares) / reach) * 100).toFixed(1)}%`;
-        
-        return {
-          id: p.id,
-          date: p.time ? new Date(p.time).toLocaleDateString() : new Date().toLocaleDateString(),
-          platform: p.platform || 'System',
-          title: p.title || 'New Campaign Content',
-          reach,
-          likes,
-          comments,
-          shares,
-          rate,
-          ai: true
-        };
-      });
-    }
-    return Array.from({ length: 15 }, (_, i) => {
-      const reach = Math.floor(Math.random() * 45000) + 5000;
-      const likes = Math.floor(Math.random() * 2000) + 100;
-      const comments = Math.floor(Math.random() * 500) + 10;
-      const shares = Math.floor(Math.random() * 300) + 5;
-      const rate = `${(((likes + comments + shares) / reach) * 100).toFixed(1)}%`;
-      return {
-        id: `f_${i}`,
-        date: new Date(Date.now() - Math.floor(Math.random() * 10000000000)).toLocaleDateString(),
-        platform: ['Facebook', 'Twitter', 'LinkedIn', 'Instagram'][Math.floor(Math.random() * 4)],
-        title: `Sample Social Media Post Content for Campaign ${i + 1}`,
-        reach,
-        likes,
-        comments,
-        shares,
-        rate,
-        ai: Math.random() > 0.3
-      };
-    });
-  }, [recentPosts]);
-
-  const [dateRange, setDateRange] = useState('30 Days');
+  const summaryLoading = summaryQ.isLoading;
+  const anyError = summaryQ.isError && perfQ.isError;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6 pb-20 md:pb-0"
-    >
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 pb-24">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-2">
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center">
-            <BarChart3 className="w-8 h-8 mr-3 text-brand-primary" />
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center gap-3">
+            <BarChart3 className="w-8 h-8 text-brand-primary" />
             Analytics
           </h1>
-          <p className="text-brand-text-muted text-sm font-mono mt-1">
-            PERFORMANCE METRICS & DEEP INSIGHTS
-          </p>
-        </motion.div>
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }} 
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-wrap items-center gap-2 bg-brand-surface p-1.5 rounded-xl border border-brand-border"
+          <p className="text-brand-text-muted text-sm font-mono mt-1">PERFORMANCE INTELLIGENCE</p>
+        </div>
+        <button
+          onClick={refetchAll}
+          className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-colors self-start"
         >
-          {timeRanges.map((range) => (
-            <button
-              key={range}
-              onClick={() => setDateRange(range)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap",
-                dateRange === range 
-                  ? "bg-brand-primary text-white shadow-glow-primary" 
-                  : "text-brand-text-muted hover:text-brand-text hover:bg-brand-elevated"
-              )}
-            >
-              {range}
-            </button>
-          ))}
-        </motion.div>
+          <RefreshCw className={cn('w-4 h-4', refetching && 'animate-spin')} />
+        </button>
       </div>
 
-      {/* Row 1: KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        {kpis.map((kpi) => (
-          <MetricCard
-            key={kpi.label}
-            type={kpi.type}
-            title={kpi.label}
-            value={kpi.value}
-            trend={kpi.trend}
-            isUp={kpi.isUp}
-          />
-        ))}
+      {anyError && (
+        <div className="p-4 bg-brand-warning/10 border border-brand-warning/30 rounded-xl text-brand-warning text-sm font-mono flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          Some analytics endpoints returned errors — displaying available data only.
+        </div>
+      )}
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <StatCard label="Total Posts"     value={(s?.total_posts    ?? 0).toLocaleString()} icon={MessageSquare} color="text-brand-primary" loading={summaryLoading} />
+        <StatCard label="Messages"        value={(s?.total_messages ?? 0).toLocaleString()} icon={Bot}           color="text-brand-accent"  loading={summaryLoading} />
+        <StatCard label="Active Users"    value={(s?.active_users   ?? 0).toLocaleString()} icon={Users}         color="text-brand-success" loading={summaryLoading} />
+        <StatCard label="API Calls"       value={(s?.api_calls      ?? 0).toLocaleString()} icon={Activity}      color="text-brand-warning" loading={summaryLoading} />
+        <StatCard label="Tokens Used"     value={(s?.token_usage    ?? 0).toLocaleString()} icon={Coins}         color="text-brand-danger"  loading={summaryLoading} />
+        <StatCard label="Engagement Rate" value={`${(s?.engagement_rate ?? 0).toFixed(1)}%`} icon={ThumbsUp}    color="text-brand-primary" loading={summaryLoading} />
       </div>
 
-      {/* Row 2: Large Charts */}
+      {/* Post + Message Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Engagement Area Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-brand-surface border border-brand-border rounded-2xl p-5"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">Engagement Over Time</h2>
-              <p className="text-xs text-brand-text-muted font-mono mt-1">REACH, LIKES & COMMENTS</p>
-            </div>
-          </div>
-          <div className="h-[280px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={engagementData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+        <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text-muted mb-5 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-brand-primary" /> Post Volume Over Time
+          </h2>
+          {perfQ.isLoading ? (
+            <div className="h-48 flex items-center justify-center"><Spinner size={24} /></div>
+          ) : perfPosts.length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-brand-text-muted font-mono text-xs uppercase">No post performance data.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={perfPosts}>
                 <defs>
-                  <linearGradient id="colorReach" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorLikes" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#06B6D4" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorComments" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                  <linearGradient id="grad-posts" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="var(--color-brand-primary)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="var(--color-brand-primary)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} tickMargin={10} minTickGap={30} />
-                <YAxis stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${val/1000}k`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-brand-border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-brand-text-muted)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--color-brand-text-muted)' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="reach" stroke="#4F46E5" strokeWidth={2} fillOpacity={1} fill="url(#colorReach)" />
-                <Area type="monotone" dataKey="likes" stroke="#06B6D4" strokeWidth={2} fillOpacity={1} fill="url(#colorLikes)" />
-                <Area type="monotone" dataKey="comments" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorComments)" />
+                <Area type="monotone" dataKey="count" name="Posts" stroke="var(--color-brand-primary)" fill="url(#grad-posts)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </motion.div>
+          )}
+        </div>
 
-        {/* Posts Performance Bar Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-          className="bg-brand-surface border border-brand-border rounded-2xl p-5"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">Posts Performance</h2>
-              <p className="text-xs text-brand-text-muted font-mono mt-1">DAILY PUBLISHED VS ENGAGEMENT</p>
-            </div>
-          </div>
-          <div className="h-[280px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={postPerformanceData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} tickMargin={10} minTickGap={15} />
-                <YAxis yAxisId="left" stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}`} />
-                <YAxis yAxisId="right" orientation="right" stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${val/1000}k`} />
+        <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text-muted mb-5 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-brand-accent" /> Message Volume Over Time
+          </h2>
+          {perfQ.isLoading ? (
+            <div className="h-48 flex items-center justify-center"><Spinner size={24} /></div>
+          ) : perfMessages.length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-brand-text-muted font-mono text-xs uppercase">No message performance data.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={perfMessages}>
+                <defs>
+                  <linearGradient id="grad-msgs" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="var(--color-brand-accent)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="var(--color-brand-accent)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-brand-border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-brand-text-muted)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--color-brand-text-muted)' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar yAxisId="left" dataKey="published" fill="#06B6D4" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                <Line yAxisId="right" type="monotone" dataKey="engagement" stroke="#F59E0B" strokeWidth={2} dot={{ r: 3, fill: '#F59E0B' }} activeDot={{ r: 5 }} />
+                <Area type="monotone" dataKey="count" name="Messages" stroke="var(--color-brand-accent)" fill="url(#grad-msgs)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* Token Usage + Top Posts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text-muted mb-2 flex items-center gap-2">
+            <Coins className="w-4 h-4 text-brand-danger" /> Token Usage
+          </h2>
+          {tokenQ.data && (
+            <div className="flex gap-6 mb-4">
+              {[
+                { label: 'Total', value: tokenQ.data.total_tokens },
+                { label: 'Prompt', value: tokenQ.data.prompt_tokens },
+                { label: 'Completion', value: tokenQ.data.completion_tokens },
+              ].filter(x => x.value !== undefined).map(x => (
+                <div key={x.label}>
+                  <div className="text-lg font-bold text-brand-text">{(x.value as number).toLocaleString()}</div>
+                  <div className="text-[10px] font-mono text-brand-text-muted uppercase">{x.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {tokenQ.isLoading ? (
+            <div className="h-40 flex items-center justify-center"><Spinner size={24} /></div>
+          ) : tokenByDay.length === 0 ? (
+            <div className="h-40 flex items-center justify-center text-brand-text-muted font-mono text-xs uppercase">No token usage data.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={tokenByDay}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-brand-border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--color-brand-text-muted)' }} />
+                <YAxis tick={{ fontSize: 9, fill: 'var(--color-brand-text-muted)' }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="tokens" name="Tokens" fill="var(--color-brand-danger)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-        </motion.div>
-      </div>
+          )}
+        </div>
 
-      {/* Row 3: Platform & Top/Worst Posts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Platform Distribution */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-brand-surface border border-brand-border rounded-2xl p-5 flex flex-col"
-        >
-          <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text mb-1">Platform Distribution</h2>
-          <p className="text-xs text-brand-text-muted font-mono mb-4">TRAFFIC SOURCES</p>
-          <div className="flex-1 min-h-[220px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={platformData}
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {platformData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value: number) => [`${value}%`, 'Share']}
-                  contentStyle={{ backgroundColor: '#141A2E', borderColor: '#1E293B', borderRadius: '8px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            {/* Center text */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-2xl font-black text-brand-text">100%</span>
-              <span className="text-[10px] text-brand-text-muted font-mono">TOTAL SHARE</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            {platformData.map(platform => (
-              <div key={platform.name} className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: platform.color }} />
-                <span className="text-xs text-brand-text">{platform.name}</span>
-                <span className="text-xs font-mono font-bold ml-auto">{platform.value}%</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Best Performing */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55 }}
-          className="bg-brand-surface border border-brand-border rounded-2xl p-5"
-        >
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">Best Performing</h2>
-              <p className="text-xs text-brand-text-muted font-mono mt-1">TOP 5 RECENT POSTS</p>
-            </div>
-            <div className="p-1.5 bg-brand-success/10 rounded-lg text-brand-success">
-              <ThumbsUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="space-y-3">
-            {bestPosts.map((post) => (
-              <div key={post.id} className="flex items-start gap-3 p-3 bg-brand-bg rounded-xl border border-brand-border">
-                <div className="w-8 h-8 rounded bg-brand-elevated flex items-center justify-center flex-shrink-0 text-brand-text font-bold text-xs">
-                  #{post.id}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-brand-text font-medium truncate">{post.title}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] uppercase font-mono text-brand-text-muted">{post.platform}</span>
-                    <span className="w-1 h-1 rounded-full bg-brand-border" />
-                    <span className="text-xs font-bold text-brand-success">{post.engagement}</span>
+        <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text-muted mb-4 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-brand-warning" /> Top Post Performance
+          </h2>
+          {postsQ.isLoading ? (
+            <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-10 bg-brand-elevated animate-pulse rounded-xl" />)}</div>
+          ) : topPosts.length === 0 ? (
+            <div className="h-40 flex items-center justify-center text-brand-text-muted font-mono text-xs uppercase">No post performance data.</div>
+          ) : (
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {topPosts.slice(0, 8).map((p: { id: string | number; title?: string; reach?: number; likes?: number; comments?: number }, i: number) => (
+                <div key={p.id ?? i} className="flex items-center gap-3 p-3 bg-brand-elevated rounded-xl border border-brand-border">
+                  <span className="text-[10px] font-mono text-brand-text-muted w-4 shrink-0">#{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-brand-text truncate">{p.title ?? `Post ${p.id}`}</div>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Worst Performing */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="bg-brand-surface border border-brand-border rounded-2xl p-5"
-        >
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">Needs Improvement</h2>
-              <p className="text-xs text-brand-text-muted font-mono mt-1">BOTTOM 5 RECENT POSTS</p>
-            </div>
-            <div className="p-1.5 bg-brand-danger/10 rounded-lg text-brand-danger">
-              <TrendingUp className="w-4 h-4 rotate-180" />
-            </div>
-          </div>
-          <div className="space-y-3">
-            {worstPosts.map((post) => (
-              <div key={post.id} className="flex items-start gap-3 p-3 bg-brand-bg rounded-xl border border-brand-border">
-                <div className="w-8 h-8 rounded bg-brand-elevated flex items-center justify-center flex-shrink-0 text-brand-text font-bold text-xs">
-                  #{post.id}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-brand-text font-medium truncate">{post.title}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] uppercase font-mono text-brand-text-muted">{post.platform}</span>
-                    <span className="w-1 h-1 rounded-full bg-brand-border" />
-                    <span className="text-xs font-bold text-brand-danger">{post.engagement}</span>
+                  <div className="flex items-center gap-3 text-[10px] font-mono shrink-0">
+                    {p.reach    !== undefined && <span className="text-brand-primary">{p.reach.toLocaleString()} reach</span>}
+                    {p.likes    !== undefined && <span className="text-brand-success">{p.likes} ♥</span>}
+                    {p.comments !== undefined && <span className="text-brand-accent">{p.comments} 💬</span>}
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Row 4: Heatmap & AI Metrics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Heatmap */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.65 }}
-          className="bg-brand-surface border border-brand-border rounded-2xl p-5 overflow-x-auto"
-        >
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">Best Posting Times</h2>
-              <p className="text-xs text-brand-text-muted font-mono mt-1">ENGAGEMENT INTENSITY BY HOUR</p>
-            </div>
-            <Calendar className="w-5 h-5 text-brand-text-muted" />
-          </div>
-          <div className="min-w-[600px]">
-            <div className="flex mb-2">
-              <div className="w-10"></div>
-              {hours.filter(h => h % 2 === 0).map(h => (
-                <div key={h} className="flex-1 text-center text-[10px] font-mono text-brand-text-muted">
-                  {h}:00
                 </div>
               ))}
             </div>
-            <div className="space-y-1">
-              {heatmapData.map((row) => (
-                <div key={row.day} className="flex items-center h-8 gap-1">
-                  <div className="w-10 text-[10px] font-mono font-bold text-brand-text-muted">{row.day}</div>
-                  <div className="flex-1 flex gap-1 h-full">
-                    {row.hours.map((intensity, idx) => (
-                      <div 
-                        key={idx}
-                        className="flex-1 rounded-sm transition-all hover:ring-2 ring-brand-text ring-offset-1 ring-offset-brand-surface cursor-pointer"
-                        style={{ 
-                          backgroundColor: '#4F46E5', 
-                          opacity: Math.max(0.1, intensity)
-                        }}
-                        title={`${row.day} ${idx}:00 - Intensity: ${Math.round(intensity * 100)}%`}
+          )}
+        </div>
+      </div>
+
+      {/* Engagement Heatmap */}
+      <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text-muted mb-5 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-brand-success" /> Engagement Heatmap — Hour × Day
+        </h2>
+        {heatmapQ.isLoading ? (
+          <div className="h-32 flex items-center justify-center"><Spinner size={24} /></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="inline-block min-w-full">
+              <div className="flex items-center gap-1 mb-1 ml-8">
+                {HOURS.map(h => (
+                  <div key={h} className="w-6 text-[8px] font-mono text-brand-text-muted text-center">{h}</div>
+                ))}
+              </div>
+              {DAYS.map((day, di) => (
+                <div key={day} className="flex items-center gap-1 mb-1">
+                  <div className="w-7 text-[9px] font-mono text-brand-text-muted shrink-0">{day}</div>
+                  {HOURS.map(hi => {
+                    const val = heatGrid[di]?.[hi] ?? 0;
+                    const opacity = val / heatMax;
+                    return (
+                      <div
+                        key={hi}
+                        title={`${day} ${hi}:00 — ${val}`}
+                        className="w-6 h-6 rounded-sm transition-opacity"
+                        style={{ backgroundColor: `rgba(99, 102, 241, ${0.08 + opacity * 0.92})` }}
                       />
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               ))}
+              <div className="flex items-center gap-2 mt-3 ml-8">
+                <span className="text-[9px] font-mono text-brand-text-muted">Low</span>
+                {[0.1, 0.3, 0.5, 0.7, 0.9].map(o => (
+                  <div key={o} className="w-5 h-5 rounded-sm" style={{ backgroundColor: `rgba(99, 102, 241, ${o})` }} />
+                ))}
+                <span className="text-[9px] font-mono text-brand-text-muted">High</span>
+              </div>
             </div>
           </div>
-        </motion.div>
-
-        {/* AI Performance */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="bg-brand-surface border border-brand-border rounded-2xl p-5 flex flex-col"
-        >
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">AI Performance & Cost</h2>
-              <p className="text-xs text-brand-text-muted font-mono mt-1">TOKEN USAGE OVER 14 DAYS</p>
-            </div>
-            <Bot className="w-5 h-5 text-brand-primary" />
-          </div>
-          
-          <div className="h-[140px] w-full mb-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={tokenUsageData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#06B6D4" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${val/1000}k`} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="tokens" stroke="#06B6D4" strokeWidth={2} fill="url(#colorTokens)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 mt-auto">
-            <div className="bg-brand-bg rounded-xl p-3 border border-brand-border">
-              <span className="block text-[10px] uppercase font-mono text-brand-text-muted mb-1">GPT-4 Tokens</span>
-              <span className="block text-lg font-bold text-brand-text">3.2M</span>
-              <span className="block text-xs text-brand-danger font-mono mt-0.5">$96.00</span>
-            </div>
-            <div className="bg-brand-bg rounded-xl p-3 border border-brand-border">
-              <span className="block text-[10px] uppercase font-mono text-brand-text-muted mb-1">GPT-3.5 Tokens</span>
-              <span className="block text-lg font-bold text-brand-text">12.5M</span>
-              <span className="block text-xs text-brand-warning font-mono mt-0.5">$25.00</span>
-            </div>
-            <div className="bg-brand-bg rounded-xl p-3 border border-brand-border">
-              <span className="block text-[10px] uppercase font-mono text-brand-text-muted mb-1">Total Cost</span>
-              <span className="block text-lg font-bold text-brand-text">$121.00</span>
-              <span className="block text-xs text-brand-success font-mono mt-0.5">Budget: $500</span>
-            </div>
-          </div>
-        </motion.div>
+        )}
       </div>
 
-      {/* Row 5: Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.75 }}
-        className="bg-brand-surface border border-brand-border rounded-2xl overflow-hidden"
-      >
-        <div className="p-5 border-b border-brand-border flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">Detailed Post Analytics</h2>
-            <p className="text-xs text-brand-text-muted font-mono mt-1">ALL PUBLISHED CONTENT</p>
-          </div>
-          <button className="text-xs font-bold text-brand-primary hover:text-brand-primary/80 transition-colors flex items-center gap-1" onClick={() => alert('Feature coming soon')}>
-            Export CSV
-            <ArrowDownRight className="w-3 h-3" />
-          </button>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
-            <thead>
-              <tr className="bg-brand-bg/50 text-[10px] uppercase tracking-wider font-mono text-brand-text-muted border-b border-brand-border">
-                <th className="p-4 font-normal">Date</th>
-                <th className="p-4 font-normal">Platform</th>
-                <th className="p-4 font-normal">Post Title</th>
-                <th className="p-4 font-normal text-right">Reach</th>
-                <th className="p-4 font-normal text-right">Likes</th>
-                <th className="p-4 font-normal text-right">Comments</th>
-                <th className="p-4 font-normal text-right">Shares</th>
-                <th className="p-4 font-normal text-right">Eng. Rate</th>
-                <th className="p-4 font-normal text-center">AI generated</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm text-brand-text">
-              {fullPosts.map((post, idx) => (
-                <tr 
-                  key={post.id} 
-                  className={cn(
-                    "border-b border-brand-border/50 hover:bg-brand-bg transition-colors",
-                    idx === fullPosts.length - 1 ? 'border-b-0' : ''
-                  )}
-                >
-                  <td className="p-4 font-mono text-brand-text-muted text-xs whitespace-nowrap">{post.date}</td>
-                  <td className="p-4">
-                    <span className="inline-flex items-center px-2 py-1 rounded bg-brand-elevated text-xs font-bold text-brand-text">
-                      {post.platform}
-                    </span>
-                  </td>
-                  <td className="p-4 font-medium truncate max-w-[200px]" title={post.title}>
-                    {post.title}
-                  </td>
-                  <td className="p-4 text-right font-mono">{post.reach.toLocaleString()}</td>
-                  <td className="p-4 text-right font-mono text-brand-accent">{post.likes.toLocaleString()}</td>
-                  <td className="p-4 text-right font-mono text-brand-success">{post.comments.toLocaleString()}</td>
-                  <td className="p-4 text-right font-mono">{post.shares.toLocaleString()}</td>
-                  <td className="p-4 text-right font-mono font-bold text-brand-text">{post.rate}</td>
-                  <td className="p-4 text-center">
-                    {post.ai ? (
-                      <span className="inline-flex items-center justify-center p-1 rounded bg-brand-primary/20 text-brand-primary" title="AI Generated">
-                        <Bot className="w-3.5 h-3.5" />
-                      </span>
-                    ) : (
-                      <span className="text-brand-text-muted">-</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="p-4 bg-brand-bg border-t border-brand-border flex items-center justify-between text-xs text-brand-text-muted">
-          <span>Showing 15 of 248 posts</span>
-          <div className="flex gap-2">
-            <button className="px-3 py-1.5 rounded bg-brand-surface border border-brand-border hover:bg-brand-elevated transition-colors disabled:opacity-50" disabled onClick={() => alert('Feature coming soon')}>Previous</button>
-            <button className="px-3 py-1.5 rounded bg-brand-surface border border-brand-border hover:bg-brand-elevated transition-colors" onClick={() => alert('Feature coming soon')}>Next</button>
+      {/* System Metrics */}
+      {metricsData.length > 0 && (
+        <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text-muted mb-5 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-brand-accent" /> System Metrics
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {metricsData.slice(0, 12).map((m, i) => (
+              <div key={i} className="bg-brand-elevated rounded-xl p-3 border border-brand-border">
+                <div className="text-xs font-bold text-brand-text truncate">{String(m.value ?? '—')}</div>
+                <div className="text-[9px] font-mono text-brand-text-muted truncate mt-0.5">{m.name}</div>
+              </div>
+            ))}
           </div>
         </div>
-      </motion.div>
+      )}
     </motion.div>
   );
 }

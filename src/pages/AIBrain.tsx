@@ -13,6 +13,7 @@ import {
   fetchAIConfig, updateAIConfig,
   fetchPersona, applyPersona,
   resetPersona, chatWithAI,
+  fetchPersonaDirect, updatePersonaDirect,
   type AIConfigPayload, type PersonaPayload,
 } from '../lib/api';
 
@@ -97,8 +98,9 @@ export default function AIBrain() {
   const showToast = (msg: string, kind: 'success' | 'error' = 'success') => setToast({ msg, kind });
 
   // ── remote data ─────────────────────────────────────────────────────────────
-  const configQ = useQuery({ queryKey: ['ai-config', restEndpoint], queryFn: () => fetchAIConfig(cfg), retry: 1, staleTime: 30_000 });
-  const personaQ = useQuery({ queryKey: ['ai-persona', restEndpoint], queryFn: () => fetchPersona(cfg), retry: 1, staleTime: 30_000 });
+  const configQ        = useQuery({ queryKey: ['ai-config',        restEndpoint], queryFn: () => fetchAIConfig(cfg),       retry: 1, staleTime: 30_000 });
+  const personaQ       = useQuery({ queryKey: ['ai-persona',       restEndpoint], queryFn: () => fetchPersona(cfg),         retry: 1, staleTime: 30_000 });
+  const personaDirectQ = useQuery({ queryKey: ['persona-direct',   restEndpoint], queryFn: () => fetchPersonaDirect(cfg),  retry: 1, staleTime: 30_000 });
 
   // ── local editable state ────────────────────────────────────────────────────
   const [model, setModel] = useState('gemini-1.5-pro');
@@ -135,6 +137,18 @@ export default function AIBrain() {
     if (d.system_prompt) setSystemPrompt(d.system_prompt);
   }, [personaQ.data]);
 
+  // Sync /persona (direct route) → fills any gaps not covered by /ai/persona
+  useEffect(() => {
+    if (!personaDirectQ.data) return;
+    const d = personaDirectQ.data;
+    if (d.tone      !== undefined && tone      === 50) setTone(d.tone);
+    if (d.humor     !== undefined && humor     === 40) setHumor(d.humor);
+    if (d.aggression !== undefined && aggression === 30) setAggression(d.aggression);
+    if (d.model && model === 'gemini-1.5-pro') setModel(d.model);
+    if (d.system_prompt && !systemPrompt) setSystemPrompt(d.system_prompt);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personaDirectQ.data]);
+
   // ── mutations ───────────────────────────────────────────────────────────────
   const saveConfigMut = useMutation({
     mutationFn: () => updateAIConfig(cfg, {
@@ -162,6 +176,13 @@ export default function AIBrain() {
       showToast('Persona saved.');
     },
     onError: (err: Error) => showToast(err?.message || 'Failed to save persona.', 'error'),
+  });
+
+  // Also persist to the direct /persona route
+  const savePersonaDirectMut = useMutation({
+    mutationFn: () => updatePersonaDirect(cfg, { tone, aggression, humor, model, system_prompt: systemPrompt }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['persona-direct', restEndpoint] }),
+    onError: () => { /* silent — /persona is secondary */ },
   });
 
   interface ResetPersonaResponse {
@@ -250,7 +271,7 @@ export default function AIBrain() {
             Reset Defaults
           </button>
           <button
-            onClick={() => { saveConfigMut.mutate(); savePersonaMut.mutate(); }}
+            onClick={() => { saveConfigMut.mutate(); savePersonaMut.mutate(); savePersonaDirectMut.mutate(); }}
             disabled={isSaving || isLoading}
             className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors shadow-glow-primary flex items-center gap-2 disabled:opacity-50"
           >
