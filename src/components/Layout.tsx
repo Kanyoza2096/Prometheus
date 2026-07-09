@@ -83,6 +83,7 @@ const NAV_ITEMS = [
   { to: '/tenants',          icon: Building2,       label: 'Tenants',         group: 'admin' },
   { to: '/brands',           icon: Palette,         label: 'Brands',          group: 'data' },
   { to: '/ai-profiles',      icon: Bot,             label: 'AI Profiles',     group: 'data' },
+  { to: '/social-accounts', icon: Link, label: 'Social Accounts', group: 'data' },
   { to: '/features',         icon: ToggleLeft,      label: 'Feature Toggles', group: 'admin' },
   { to: '/monitoring',       icon: Cpu,             label: 'Monitoring',      group: 'admin' },
   { to: '/ai-chat',          icon: MessageCircle,   label: 'AI Chat',         group: 'admin' },
