@@ -76,6 +76,11 @@ interface AppState {
 
   currentTenant: string;
   setCurrentTenant: (tenant: string) => void;
+
+  selectedWorkspaceId: string | number | null;
+  setSelectedWorkspaceId: (id: string | number | null) => void;
+  selectedBrandId: string | number | null;
+  setSelectedBrandId: (id: string | number | null) => void;
   
   wsEndpoint: string;
   restEndpoint: string;
@@ -195,6 +200,20 @@ export const useStore = create<AppState>((set, get) => ({
   setCurrentTenant: (tenant) => {
     localStorage.setItem('current_tenant', tenant);
     set({ currentTenant: tenant });
+  },
+
+  selectedWorkspaceId: localStorage.getItem('selected_workspace_id') || null,
+  setSelectedWorkspaceId: (id) => {
+    if (id === null) localStorage.removeItem('selected_workspace_id');
+    else localStorage.setItem('selected_workspace_id', String(id));
+    set({ selectedWorkspaceId: id, selectedBrandId: null });
+    localStorage.removeItem('selected_brand_id');
+  },
+  selectedBrandId: localStorage.getItem('selected_brand_id') || null,
+  setSelectedBrandId: (id) => {
+    if (id === null) localStorage.removeItem('selected_brand_id');
+    else localStorage.setItem('selected_brand_id', String(id));
+    set({ selectedBrandId: id });
   },
 
   wsEndpoint: localStorage.getItem('ws_endpoint') || import.meta.env.VITE_WS_ENDPOINT || 'wss://kanyoza-systems-bot.onrender.com',

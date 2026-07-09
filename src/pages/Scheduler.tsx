@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, Zap, RefreshCcw, Check, AlertCircle, Loader2, Activity, Calendar, Send } from 'lucide-react';
+import { Clock, Zap, RefreshCcw, Check, AlertCircle, Activity, Calendar, Send } from 'lucide-react';
+import { Spinner } from '../components/Spinner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
@@ -166,7 +167,7 @@ export default function Scheduler() {
             className="bg-brand-primary text-white px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors shadow-glow-primary flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {postMut.isPending
-              ? <><Loader2 className="w-4 h-4 animate-spin" />Queuing…</>
+              ? <><Spinner size={16} />Queuing…</>
               : <><Send className="w-4 h-4" />Post Now</>}
           </motion.button>
         </div>
@@ -203,7 +204,7 @@ export default function Scheduler() {
             <Clock className="w-4 h-4 mr-2 text-brand-accent" />
             Content Post Hours — UTC ({displayContentHours.length} slots / day)
           </h2>
-          {schedLoading && <Loader2 className="w-4 h-4 animate-spin text-brand-text-muted" />}
+          {schedLoading && <Spinner size={16} />}
         </div>
         <p className="text-xs text-brand-text-muted font-mono mb-4">
           Click an hour to toggle it. Highlighted slots = active posting times.
@@ -297,7 +298,7 @@ export default function Scheduler() {
                 className="bg-brand-primary text-white px-5 py-2 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors flex items-center gap-2 disabled:opacity-60"
               >
                 {saveMut.isPending
-                  ? <><Loader2 className="w-4 h-4 animate-spin" />Saving…</>
+                  ? <><Spinner size={16} />Saving…</>
                   : <><Check className="w-4 h-4" />Save Schedule</>}
               </button>
             </div>

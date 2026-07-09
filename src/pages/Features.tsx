@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ToggleLeft, Loader2, AlertTriangle } from 'lucide-react';
+import { ToggleLeft, AlertTriangle } from 'lucide-react';
+import { Spinner } from '../components/Spinner';
 import { useStore } from '../store/useStore';
 import { fetchFeatures, toggleFeature } from '../lib/api';
 import { cn } from '../lib/utils';
@@ -101,7 +102,7 @@ export default function Features() {
                   )}
                 >
                   {toggleMut.isPending && toggleMut.variables?.feature === key && (
-                    <Loader2 className="w-3 h-3 animate-spin text-brand-text-muted" />
+                    <Spinner size={12} />
                   )}
                 </motion.span>
               </button>

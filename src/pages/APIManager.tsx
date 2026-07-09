@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Key, Plus, Copy, Trash2, Eye, EyeOff, Loader2, AlertTriangle } from 'lucide-react';
+import { Key, Plus, Copy, Trash2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Spinner } from '../components/Spinner';
 import { useStore } from '../store/useStore';
 import { fetchApiKeys, generateApiKeyLabeled, revokeApiKey, type ApiKeyEntry } from '../lib/api';
 
@@ -123,7 +124,7 @@ export default function APIManager() {
               disabled={genMut.isPending || !label.trim()}
               className="px-4 py-2 bg-brand-primary text-white rounded-xl text-sm font-semibold shadow-glow-primary disabled:opacity-50 flex items-center gap-2"
             >
-              {genMut.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {genMut.isPending && <Spinner size={16} />}
               Generate
             </button>
           </div>
@@ -222,7 +223,7 @@ export default function APIManager() {
                 disabled={revokeMut.isPending}
                 className="px-4 py-2 bg-brand-danger text-white rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2"
               >
-                {revokeMut.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {revokeMut.isPending && <Spinner size={16} />}
                 Revoke
               </button>
             </div>

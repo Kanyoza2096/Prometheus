@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   GitBranch, Play, Pause, Settings, RefreshCcw, Plus, Trash2, 
   CheckCircle2, Clock, AlertCircle, Database, Server, Zap, Globe, 
-  MessageSquare, Brain, Image, Calendar, Shield, Activity, Lock, Edit3, Send, Loader2
+  MessageSquare, Brain, Image, Calendar, Shield, Activity, Lock, Edit3, Send
 } from 'lucide-react';
+import { Spinner } from '../components/Spinner';
 import { useMutation } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
@@ -30,7 +31,7 @@ type WorkflowConfig = {
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
   GitBranch, Play, Pause, Settings, RefreshCcw, Plus, Trash2, 
   CheckCircle2, Clock, AlertCircle, Database, Server, Zap, Globe, 
-  MessageSquare, Brain, Image, Calendar, Shield, Activity, Lock, Edit3, Send, Loader2
+  MessageSquare, Brain, Image, Calendar, Shield, Activity, Lock, Edit3, Send
 };
 
 const getIcon = (icon: any): React.ComponentType<any> => {
@@ -224,7 +225,7 @@ export default function Workflows() {
             className="bg-brand-elevated border border-brand-border text-brand-text px-4 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider hover:border-brand-primary/50 transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {triggerMut.isPending
-              ? <><Loader2 className="w-4 h-4 animate-spin" />Queuing…</>
+              ? <><Spinner size={16} />Queuing…</>
               : <><Send className="w-4 h-4 text-brand-primary" />Trigger Post</>}
           </button>
           <button className="bg-brand-primary text-white px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors shadow-glow-primary flex items-center shrink-0" onClick={() => {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldAlert, CheckCircle, Search, Filter, Loader2, AlertTriangle, Shield, X, ChevronDown, ExternalLink, ShieldOff } from 'lucide-react';
+import { ShieldAlert, CheckCircle, Search, Filter, AlertTriangle, Shield, X, ChevronDown, ExternalLink, ShieldOff } from 'lucide-react';
+import { Spinner } from '../components/Spinner';
 import { useStore } from '../store/useStore';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '../lib/utils';
@@ -123,7 +124,7 @@ export default function Guardian() {
             className="bg-brand-elevated border border-brand-border hover:bg-brand-border text-brand-text px-5 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider transition-colors flex items-center self-start md:self-auto group disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isScanning
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin text-brand-primary" />Scanning…</>
+              ? <><Spinner size={16} className="mr-2" />Scanning…</>
               : <><Search className="w-4 h-4 mr-2 text-brand-text-muted group-hover:text-brand-primary transition-colors" />Scan Now</>}
           </button>
         </div>

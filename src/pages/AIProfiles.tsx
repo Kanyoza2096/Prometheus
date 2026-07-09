@@ -1,26 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bot, Plus, Trash2, Edit2, Loader2, AlertTriangle, X } from 'lucide-react';
+import { Bot, Plus, Trash2, Edit2, AlertTriangle, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { fetchWorkspaces, fetchAIProfiles, createAIProfile, updateAIProfile, deleteAIProfile, type AIProfile, type Workspace } from '../lib/api';
+import { Spinner } from '../components/Spinner';
+import { Skeleton } from '../components/Skeleton';
+import { fetchAIProfiles, createAIProfile, updateAIProfile, deleteAIProfile, type AIProfile } from '../lib/api';
 
 export default function AIProfiles() {
-  const { restEndpoint, masterToken, triggerNotification } = useStore();
+  const { restEndpoint, masterToken, triggerNotification, selectedWorkspaceId: workspaceId } = useStore();
   const cfg = { restEndpoint, masterToken };
   const qc = useQueryClient();
-
-  const { data: wsData } = useQuery({
-    queryKey: ['workspaces', restEndpoint],
-    queryFn: () => fetchWorkspaces(cfg),
-    retry: 1,
-  });
-  const workspaces: Workspace[] = wsData?.workspaces ?? [];
-  const [workspaceId, setWorkspaceId] = useState<string | number | null>(null);
-
-  useEffect(() => {
-    if (!workspaceId && workspaces.length > 0) setWorkspaceId(workspaces[0].id);
-  }, [workspaces, workspaceId]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['ai-profiles', restEndpoint, workspaceId],
@@ -101,14 +91,6 @@ export default function AIProfiles() {
           <p className="text-brand-text-muted text-sm font-mono mt-1">PER-WORKSPACE AI PERSONA PROFILES</p>
         </div>
         <div className="flex items-center gap-3">
-          <select
-            value={workspaceId ?? ''}
-            onChange={e => setWorkspaceId(e.target.value)}
-            className="px-3 py-2 bg-brand-surface border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary"
-          >
-            {workspaces.length === 0 && <option value="">No workspaces</option>}
-            {workspaces.map(ws => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
-          </select>
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -179,7 +161,7 @@ export default function AIProfiles() {
             <div className="flex justify-end gap-2">
               <button type="button" className="px-4 py-2 bg-brand-surface hover:bg-brand-elevated border border-brand-border text-brand-text-muted rounded-xl text-sm font-semibold" onClick={resetForm}>Cancel</button>
               <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl text-sm font-semibold shadow-glow-primary disabled:opacity-50 flex items-center gap-2">
-                {(createMut.isPending || updateMut.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
+                {(createMut.isPending || updateMut.isPending) && <Spinner size={14} />}
                 {editing ? 'Save Changes' : 'Create Profile'}
               </button>
             </div>
@@ -195,7 +177,7 @@ export default function AIProfiles() {
 
       {workspaceId && isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-40 bg-brand-surface/60 border border-brand-border rounded-2xl animate-pulse" />)}
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}
         </div>
       )}
 
@@ -250,7 +232,7 @@ export default function AIProfiles() {
             <div className="flex justify-end gap-2">
               <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 bg-brand-elevated border border-brand-border text-brand-text-muted rounded-xl text-sm font-semibold">Cancel</button>
               <button onClick={() => deleteMut.mutate(confirmDelete.id)} disabled={deleteMut.isPending} className="px-4 py-2 bg-brand-danger text-white rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
-                {deleteMut.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {deleteMut.isPending && <Spinner size={14} />}
                 Delete
               </button>
             </div>

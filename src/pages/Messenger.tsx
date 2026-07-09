@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MessageSquare, Send, Search, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
+import { MessageSquare, Send, Search, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Spinner } from '../components/Spinner';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
 import { fetchConversations, fetchConversation, sendMessageReply, type ConversationSummary, type MessageEntry } from '../lib/api';
@@ -189,7 +190,7 @@ export default function Messenger() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-brand-surface/20">
             {msgLoading && (
               <div className="flex justify-center py-10">
-                <Loader2 className="w-5 h-5 animate-spin text-brand-text-muted" />
+                <Spinner size={20} />
               </div>
             )}
             {msgError && (
@@ -236,7 +237,7 @@ export default function Messenger() {
                 disabled={replyMut.isPending || !messageInput.trim()}
                 className="w-10 h-10 rounded-xl bg-brand-primary text-white hover:bg-brand-primary/90 transition-colors shadow-glow-primary flex items-center justify-center disabled:opacity-50"
               >
-                {replyMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {replyMut.isPending ? <Spinner size={16} /> : <Send className="w-4 h-4" />}
               </button>
             </div>
           </form>

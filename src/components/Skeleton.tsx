@@ -6,13 +6,18 @@ interface SkeletonProps {
   className?: string;
 }
 
-/** Single animated placeholder block */
+/** Single animated placeholder block with a premium shimmer sweep */
 export const Skeleton = ({ className }: SkeletonProps) => (
-  <motion.div 
-    className={cn('rounded-md bg-white/5', className)}
-    animate={{ opacity: [0.5, 1, 0.5] }}
-    transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
-  />
+  <div className={cn('relative overflow-hidden rounded-md bg-white/5', className)}>
+    <motion.div
+      className="absolute inset-0"
+      style={{
+        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.09), transparent)',
+      }}
+      animate={{ x: ['-100%', '100%'] }}
+      transition={{ repeat: Infinity, duration: 1.6, ease: 'easeInOut' }}
+    />
+  </div>
 );
 
 /** Mimics a stat card (title + big number + subtitle) */

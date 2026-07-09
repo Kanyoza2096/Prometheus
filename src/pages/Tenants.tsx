@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, Users, Trash2, Edit2, Loader2, AlertTriangle, X } from 'lucide-react';
+import { Building2, Plus, Users, Trash2, Edit2, AlertTriangle, X } from 'lucide-react';
+import { Spinner } from '../components/Spinner';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
 import { fetchWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, type Workspace } from '../lib/api';
@@ -141,7 +142,7 @@ export default function Tenants() {
                 Cancel
               </button>
               <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl text-sm font-semibold shadow-glow-primary transition-colors disabled:opacity-50 flex items-center gap-2">
-                {(createMut.isPending || updateMut.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
+                {(createMut.isPending || updateMut.isPending) && <Spinner size={16} />}
                 {editing ? 'Save Changes' : 'Register'}
               </button>
             </div>
@@ -225,7 +226,7 @@ export default function Tenants() {
             <div className="flex justify-end gap-2">
               <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 bg-brand-elevated border border-brand-border text-brand-text-muted rounded-xl text-sm font-semibold">Cancel</button>
               <button onClick={() => deleteMut.mutate(confirmDelete.id)} disabled={deleteMut.isPending} className="px-4 py-2 bg-brand-danger text-white rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
-                {deleteMut.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {deleteMut.isPending && <Spinner size={16} />}
                 Delete
               </button>
             </div>

@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, Search, Plus, FileText, Trash2, Loader2, AlertTriangle, X } from 'lucide-react';
+import { BookOpen, Search, Plus, FileText, Trash2, AlertTriangle, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { fetchWorkspaces, fetchBrands, fetchKnowledgeDocs, createKnowledgeDoc, deleteKnowledgeDoc, searchKnowledge, type Workspace, type Brand, type KnowledgeDoc } from '../lib/api';
+import { Spinner } from '../components/Spinner';
+import { Skeleton } from '../components/Skeleton';
+import { fetchBrands, fetchKnowledgeDocs, createKnowledgeDoc, deleteKnowledgeDoc, searchKnowledge, type Brand, type KnowledgeDoc } from '../lib/api';
 
 const DOC_TYPES = ['fact', 'faq', 'policy', 'product', 'general'];
 
 export default function KnowledgeBase() {
-  const { restEndpoint, masterToken, triggerNotification } = useStore();
+  const {
+    restEndpoint, masterToken, triggerNotification,
+    selectedWorkspaceId: workspaceId,
+    selectedBrandId: brandId, setSelectedBrandId: setBrandId,
+  } = useStore();
   const cfg = { restEndpoint, masterToken };
   const qc = useQueryClient();
-
-  const { data: wsData } = useQuery({ queryKey: ['workspaces', restEndpoint], queryFn: () => fetchWorkspaces(cfg), retry: 1 });
-  const workspaces: Workspace[] = wsData?.workspaces ?? [];
-  const [workspaceId, setWorkspaceId] = useState<string | number | null>(null);
-  useEffect(() => { if (!workspaceId && workspaces.length > 0) setWorkspaceId(workspaces[0].id); }, [workspaces, workspaceId]);
 
   const { data: brandData } = useQuery({
     queryKey: ['brands', restEndpoint, workspaceId],
@@ -23,8 +24,9 @@ export default function KnowledgeBase() {
     enabled: !!workspaceId,
   });
   const brands: Brand[] = brandData?.brands ?? [];
-  const [brandId, setBrandId] = useState<string | number | null>(null);
-  useEffect(() => { setBrandId(brands.length > 0 ? brands[0].id : null); }, [brands]);
+  useEffect(() => {
+    if (!brandId && brands.length > 0) setBrandId(brands[0].id);
+  }, [brands, brandId, setBrandId]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['knowledge', restEndpoint, brandId],
@@ -86,10 +88,6 @@ export default function KnowledgeBase() {
           <p className="text-brand-text-muted text-sm font-mono mt-1">RAG DOCUMENT SOURCES</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <select value={workspaceId ?? ''} onChange={e => setWorkspaceId(e.target.value)} className="px-3 py-2 bg-brand-surface border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary">
-            {workspaces.length === 0 && <option value="">No workspaces</option>}
-            {workspaces.map(ws => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
-          </select>
           <select value={brandId ?? ''} onChange={e => setBrandId(e.target.value)} className="px-3 py-2 bg-brand-surface border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary">
             {brands.length === 0 && <option value="">No brands</option>}
             {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -143,7 +141,7 @@ export default function KnowledgeBase() {
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-brand-surface hover:bg-brand-elevated border border-brand-border text-brand-text-muted rounded-xl text-sm font-semibold">Cancel</button>
               <button type="submit" disabled={createMut.isPending} className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl text-sm font-semibold shadow-glow-primary disabled:opacity-50 flex items-center gap-2">
-                {createMut.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {createMut.isPending && <Spinner size={14} />}
                 Save Document
               </button>
             </div>
@@ -159,7 +157,7 @@ export default function KnowledgeBase() {
 
       {brandId && (isLoading || searchMut.isPending) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-40 bg-brand-surface/60 border border-brand-border rounded-2xl animate-pulse" />)}
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}
         </div>
       )}
 
@@ -217,7 +215,7 @@ export default function KnowledgeBase() {
             <div className="flex justify-end gap-2">
               <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 bg-brand-elevated border border-brand-border text-brand-text-muted rounded-xl text-sm font-semibold">Cancel</button>
               <button onClick={() => deleteMut.mutate(confirmDelete.id)} disabled={deleteMut.isPending} className="px-4 py-2 bg-brand-danger text-white rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
-                {deleteMut.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {deleteMut.isPending && <Spinner size={14} />}
                 Delete
               </button>
             </div>

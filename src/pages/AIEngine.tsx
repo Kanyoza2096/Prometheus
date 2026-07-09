@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BrainCircuit, SlidersHorizontal, Target, Zap, Bot, MessageSquareText, Check, Loader2, AlertCircle, Wifi, WifiOff, Send, RotateCcw } from 'lucide-react';
+import { BrainCircuit, SlidersHorizontal, Target, Zap, Bot, MessageSquareText, Check, AlertCircle, Wifi, WifiOff, Send, RotateCcw } from 'lucide-react';
+import { Spinner } from '../components/Spinner';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
@@ -231,7 +232,7 @@ export default function AIEngine() {
             disabled={resetMut.isPending}
             className="bg-brand-elevated border border-brand-border text-brand-text-muted px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider hover:border-brand-danger/40 hover:text-brand-danger transition-colors flex items-center gap-2 disabled:opacity-60"
           >
-            {resetMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+            {resetMut.isPending ? <Spinner size={14} /> : <RotateCcw className="w-3.5 h-3.5" />}
             Reset to Defaults
           </button>
         </div>
@@ -337,7 +338,7 @@ export default function AIEngine() {
                 className="bg-brand-primary text-white px-6 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors shadow-glow-primary flex items-center disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isSaving
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+                  ? <><Spinner size={16} className="mr-2" />Saving…</>
                   : <><Zap className="w-4 h-4 mr-2" />Apply Persona</>}
               </button>
             </div>
@@ -428,7 +429,7 @@ export default function AIEngine() {
               ))}
               {chatMut.isPending && (
                 <div className="flex items-center gap-2 text-xs text-brand-text-muted font-mono">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> thinking…
+                  <Spinner size={14} /> thinking…
                 </div>
               )}
             </div>

@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Send, Plus, Clock, X, CheckCircle2,
-  Trash2, Loader2, AlertCircle, RefreshCcw, Facebook, Twitter, Linkedin,
+  Trash2, AlertCircle, RefreshCcw, Facebook, Twitter, Linkedin,
 } from 'lucide-react';
+import { Spinner } from '../components/Spinner';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
 import { fetchPosts, createPost, deletePost, forcePostNow, type PostRecord } from '../lib/api';
@@ -158,7 +159,7 @@ export default function Posts() {
             disabled={forcePostMut.isPending}
             className="bg-brand-elevated border border-brand-border text-brand-text px-4 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider hover:border-brand-primary/40 transition-colors flex items-center gap-2 disabled:opacity-60"
           >
-            {forcePostMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            {forcePostMut.isPending ? <Spinner size={16} /> : <Send className="w-4 h-4" />}
             Force Post
           </motion.button>
           <button
@@ -383,7 +384,7 @@ export default function Posts() {
                     disabled={submitDisabled}
                     className="flex-1 py-2.5 bg-brand-primary text-white rounded-xl text-xs font-bold uppercase hover:bg-brand-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    {createMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    {createMut.isPending ? <Spinner size={16} /> : <CheckCircle2 className="w-4 h-4" />}
                     Submit
                   </button>
                 </div>
@@ -424,7 +425,7 @@ export default function Posts() {
                     disabled={deleteMut.isPending}
                     className="flex-1 py-2.5 bg-brand-danger text-white rounded-xl text-xs font-bold uppercase hover:bg-brand-danger/90 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    {deleteMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    {deleteMut.isPending ? <Spinner size={16} /> : <Trash2 className="w-4 h-4" />}
                     Delete
                   </button>
                 </div>

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { useQuery } from '@tanstack/react-query';
 import { useStore } from '../store/useStore';
+import { fetchWorkspaces, type Workspace } from '../lib/api';
 import {
   LayoutDashboard,
   FileText,
@@ -109,6 +111,7 @@ export default function Layout() {
     startRealtimeSubscriptions, stopRealtimeSubscriptions,
     socketError, socketReconnectAttempts, socketTransport,
     theme, toggleTheme, currentTenant, setCurrentTenant,
+    selectedWorkspaceId, setSelectedWorkspaceId,
     stats, healthMatrix,
   } = useStore();
 
@@ -117,6 +120,7 @@ export default function Layout() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isAdminMenuOpen,     setIsAdminMenuOpen]     = useState(false);
   const [isTenantOpen,        setIsTenantOpen]        = useState(false);
+  const [isWorkspaceOpen,     setIsWorkspaceOpen]     = useState(false);
   const [isSearchOpen,        setIsSearchOpen]        = useState(false);
   const [searchQuery,         setSearchQuery]         = useState('');
   const [clockTime,           setClockTime]           = useState(() => new Date().toISOString().replace('T', ' ').substring(0, 19));
@@ -190,6 +194,18 @@ export default function Layout() {
     if (!useStore.getState().isTerminalOpen) toggleTerminal();
     if (path) navigate(path);
   };
+
+  const { data: workspacesData } = useQuery({
+    queryKey: ['workspaces', restEndpoint],
+    queryFn: () => fetchWorkspaces({ restEndpoint, masterToken }),
+    retry: 1,
+    staleTime: 60_000,
+  });
+  const workspaces: Workspace[] = workspacesData?.workspaces ?? [];
+  useEffect(() => {
+    if (!selectedWorkspaceId && workspaces.length > 0) setSelectedWorkspaceId(workspaces[0].id);
+  }, [workspaces, selectedWorkspaceId, setSelectedWorkspaceId]);
+  const activeWorkspace = workspaces.find(w => String(w.id) === String(selectedWorkspaceId));
 
   const unreadAlerts = guardianAlerts.filter(a => a.severity === 'CRITICAL').length;
   const criticalHealth = healthMatrix.filter(h => h.status === 'offline').length;
@@ -386,10 +402,58 @@ export default function Layout() {
             </AnimatePresence>
           </div>
 
+          {/* Workspace selector — global scope for Brands / AI Profiles / Integrations / Knowledge Base */}
+          <div className="relative hidden lg:block">
+            <button
+              onClick={() => { setIsWorkspaceOpen(!isWorkspaceOpen); setIsAdminMenuOpen(false); setIsNotificationsOpen(false); setIsTenantOpen(false); }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-brand-elevated border border-brand-border text-xs font-medium transition-colors"
+            >
+              <LayoutGrid className="w-3.5 h-3.5 text-brand-primary" />
+              <span className="max-w-28 truncate">{activeWorkspace?.name || (workspaces.length === 0 ? 'No workspaces' : 'Select workspace')}</span>
+              <ChevronDown className="w-3 h-3 text-brand-text-muted" />
+            </button>
+            <AnimatePresence>
+              {isWorkspaceOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                  transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute right-0 top-full mt-2 w-56 bg-brand-surface border border-brand-border rounded-xl shadow-2xl z-50 overflow-hidden"
+                >
+                  <div className="p-3 border-b border-brand-border">
+                    <p className="text-xs font-bold text-brand-text-muted uppercase tracking-wider">Active Workspace</p>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {workspaces.length === 0 && (
+                      <p className="px-3 py-4 text-xs text-brand-text-muted font-mono">No workspaces yet.</p>
+                    )}
+                    {workspaces.map(ws => (
+                      <button
+                        key={ws.id}
+                        onClick={() => { setSelectedWorkspaceId(ws.id); setIsWorkspaceOpen(false); }}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-brand-elevated transition-colors text-left',
+                          String(selectedWorkspaceId) === String(ws.id) && 'bg-brand-primary/10 text-brand-primary'
+                        )}
+                      >
+                        <div className="w-6 h-6 rounded-md bg-brand-primary/20 text-brand-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                          {ws.name[0]?.toUpperCase()}
+                        </div>
+                        <span className="truncate font-medium">{ws.name}</span>
+                        {String(selectedWorkspaceId) === String(ws.id) && <CheckCircle className="w-3.5 h-3.5 ml-auto flex-shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           {/* Tenant selector */}
           <div className="relative hidden md:block">
             <button
-              onClick={() => { setIsTenantOpen(!isTenantOpen); setIsAdminMenuOpen(false); setIsNotificationsOpen(false); }}
+              onClick={() => { setIsTenantOpen(!isTenantOpen); setIsAdminMenuOpen(false); setIsNotificationsOpen(false); setIsWorkspaceOpen(false); }}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-brand-elevated border border-brand-border text-xs font-medium transition-colors"
             >
               <Building2 className="w-3.5 h-3.5 text-brand-text-muted" />
