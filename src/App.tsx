@@ -37,6 +37,7 @@ const AIChat            = lazy(() => import('./pages/AIChat'));
 const Brands            = lazy(() => import('./pages/Brands'));
 const AIProfiles        = lazy(() => import('./pages/AIProfiles'));
 const Features          = lazy(() => import('./pages/Features'));
+const SocialAccounts    = lazy(() => import('./pages/SocialAccounts'));
 
 /**
  * Wraps each route in an ErrorBoundary + Suspense so that:

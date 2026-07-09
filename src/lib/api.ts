@@ -209,9 +209,28 @@ export const triggerPostNow = (cfg: ApiConfig) =>
     cfg, '/bot/post', { method: 'POST' }
   );
 
+// ── AI Config ─────────────────────────────────────────────────────────────────
+
+export interface AIConfigPayload {
+  model?: string;
+  temperature?: number;
+  safety_level?: string;
+  tone_assertiveness?: number;
+  tone_humor?: number;
+  tone_formality?: number;
+  persona_mood?: string;
+  system_prompt_override?: string;
+  [k: string]: unknown;
+}
+
+export const fetchAIConfig = (cfg: ApiConfig) =>
+  request<AIConfigPayload>(cfg, '/ai/config');
+
 /** Update AI model, temperature, or personality at runtime. */
 export const updateAIConfig = (cfg: ApiConfig, payload: {
   model?: string;
+  temperature?: number;
+  safety_level?: string;
   tone_assertiveness?: number;
   tone_humor?: number;
   tone_formality?: number;
