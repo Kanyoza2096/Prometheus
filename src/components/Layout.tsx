@@ -450,47 +450,63 @@ export default function Layout() {
             </AnimatePresence>
           </div>
 
-          {/* Tenant selector */}
-          <div className="relative hidden md:block">
+          {/* Tenant selector — now uses real workspace data */}
+<div className="relative hidden md:block">
+  <button
+    onClick={() => { setIsTenantOpen(!isTenantOpen); setIsAdminMenuOpen(false); setIsNotificationsOpen(false); setIsWorkspaceOpen(false); }}
+    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-brand-elevated border border-brand-border text-xs font-medium transition-colors"
+  >
+    <Building2 className="w-3.5 h-3.5 text-brand-text-muted" />
+    <span className="max-w-24 truncate">{activeWorkspace?.name || currentTenant}</span>
+    <ChevronDown className="w-3 h-3 text-brand-text-muted" />
+  </button>
+  <AnimatePresence>
+    {isTenantOpen && (
+      <motion.div
+        initial={{ opacity: 0, y: 8, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+        className="absolute right-0 top-full mt-2 w-52 bg-brand-surface border border-brand-border rounded-xl shadow-2xl z-50 overflow-hidden"
+      >
+        <div className="p-3 border-b border-brand-border">
+          <p className="text-xs font-bold text-brand-text-muted uppercase tracking-wider">Switch Workspace</p>
+        </div>
+        {workspaces.length === 0 ? (
+          <p className="px-3 py-4 text-xs text-brand-text-muted font-mono">No workspaces yet.</p>
+        ) : (
+          workspaces.map(ws => (
             <button
-              onClick={() => { setIsTenantOpen(!isTenantOpen); setIsAdminMenuOpen(false); setIsNotificationsOpen(false); setIsWorkspaceOpen(false); }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-brand-elevated border border-brand-border text-xs font-medium transition-colors"
-            >
-              <Building2 className="w-3.5 h-3.5 text-brand-text-muted" />
-              <span className="max-w-24 truncate">{currentTenant}</span>
-              <ChevronDown className="w-3 h-3 text-brand-text-muted" />
-            </button>
-            <AnimatePresence>
-              {isTenantOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                  className="absolute right-0 top-full mt-2 w-52 bg-brand-surface border border-brand-border rounded-xl shadow-2xl z-50 overflow-hidden"
-                >
-                  <div className="p-3 border-b border-brand-border">
-                    <p className="text-xs font-bold text-brand-text-muted uppercase tracking-wider">Switch Tenant</p>
-                  </div>
-                  {TENANTS.map(t => (
-                    <button
-                      key={t}
-                      onClick={() => { setCurrentTenant(t); setIsTenantOpen(false); }}
-                      className={cn(
-                        'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-brand-elevated transition-colors text-left',
-                        currentTenant === t && 'bg-brand-primary/10 text-brand-primary'
-                      )}
-                    >
-                      <div className="w-6 h-6 rounded-md bg-brand-primary/20 text-brand-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                        {t[0]}
-                      </div>
-                      <span className="truncate font-medium">{t}</span>
-                      {currentTenant === t && <CheckCircle className="w-3.5 h-3.5 ml-auto flex-shrink-0" />}
-                    </button>
-                  ))}
-                </motion.div>
+              key={ws.id}
+              onClick={() => { 
+                setCurrentTenant(ws.name); 
+                setSelectedWorkspaceId(ws.id); 
+                setIsTenantOpen(false); 
+              }}
+              className={cn(
+                'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-brand-elevated transition-colors text-left',
+                String(selectedWorkspaceId) === String(ws.id) && 'bg-brand-primary/10 text-brand-primary'
               )}
-            </AnimatePresence>
-          </div>
+            >
+              <div className="w-6 h-6 rounded-md bg-brand-primary/20 text-brand-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                {ws.name[0]?.toUpperCase()}
+              </div>
+              <span className="truncate font-medium">{ws.name}</span>
+              {String(selectedWorkspaceId) === String(ws.id) && <CheckCircle className="w-3.5 h-3.5 ml-auto flex-shrink-0" />}
+            </button>
+          ))
+        )}
+        <div className="p-1.5 border-t border-brand-border">
+          <button
+            onClick={() => { navigate('/tenants'); setIsTenantOpen(false); }}
+            className="w-full py-2 text-xs font-semibold text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors"
+          >
+            Manage Workspaces
+          </button>
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+</div>
 
           {/* User menu */}
           <div className="relative border-l border-brand-border ml-1 pl-2">
