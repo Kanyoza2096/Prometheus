@@ -360,3 +360,57 @@ export interface IntegrationsPayload {
 
 export const fetchIntegrations = (cfg: ApiConfig) =>
   request<IntegrationsPayload>(cfg, '/integrations');
+
+// ── Posts ─────────────────────────────────────────────────────────────────────
+
+export interface PostRecord {
+  id: string | number;
+  caption?: string;
+  topic?: string;
+  category?: string;
+  platform?: string;
+  state?: 'published' | 'draft' | 'scheduled';
+  status?: string;
+  engagement?: number;
+  thumbnail?: string;
+  created_at?: string;
+  scheduled_for?: string;
+  [k: string]: unknown;
+}
+
+export interface PostsPayload {
+  posts: PostRecord[];
+  total?: number;
+  page?: number;
+  per_page?: number;
+}
+
+export const fetchPosts = (
+  cfg: ApiConfig,
+  opts: { page?: number; per_page?: number; state?: string } = {}
+) => {
+  const params = new URLSearchParams();
+  params.append('page', String(opts.page ?? 1));
+  params.append('per_page', String(opts.per_page ?? 20));
+  if (opts.state) params.append('state', opts.state);
+  return request<PostsPayload>(cfg, `/posts?${params}`);
+};
+
+export const createPost = (cfg: ApiConfig, payload: {
+  caption: string;
+  topic?: string;
+  category?: string;
+  state: 'publish' | 'draft';
+  platforms?: string[];
+  scheduled_for?: string;
+}) =>
+  request<{ ok: boolean; post?: PostRecord }>(cfg, '/posts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const deletePost = (cfg: ApiConfig, id: string | number) =>
+  request<{ ok: boolean }>(cfg, `/posts/${id}`, { method: 'DELETE' });
+
+export const forcePostNow = (cfg: ApiConfig) =>
+  request<{ ok: boolean; queued?: boolean; message?: string }>(cfg, '/bot/post', { method: 'POST' });
