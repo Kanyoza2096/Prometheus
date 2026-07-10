@@ -1,513 +1,326 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import {
-  BrainCircuit, Cpu, Settings2, Sparkles, Check, RotateCcw,
-  AlertCircle, Send, Bot, ChevronDown, Sliders, Shield,
-  MessageSquare, RefreshCw,
-} from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cn } from '../lib/utils';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
 import { useStore } from '../store/useStore';
-import { Spinner } from '../components/Spinner';
-import {
-  fetchAIConfig, updateAIConfig,
-  fetchPersona, applyPersona,
-  resetPersona, chatWithAI,
-  fetchPersonaDirect, updatePersonaDirect,
-  type AIConfigPayload, type PersonaPayload,
-} from '../lib/api';
-
-// ── constants ─────────────────────────────────────────────────────────────────
-
-const MODEL_OPTIONS = [
-  { id: 'gemini-1.5-pro',     name: 'Gemini 1.5 Pro',     provider: 'Google',    ctx: '1M tokens' },
-  { id: 'gemini-1.5-flash',   name: 'Gemini 1.5 Flash',   provider: 'Google',    ctx: '1M tokens' },
-  { id: 'gemini-2.0-flash',   name: 'Gemini 2.0 Flash',   provider: 'Google',    ctx: '1M tokens' },
-  { id: 'gpt-4o',             name: 'GPT-4o',             provider: 'OpenAI',    ctx: '128k tokens' },
-  { id: 'claude-3-5-sonnet',  name: 'Claude 3.5 Sonnet',  provider: 'Anthropic', ctx: '200k tokens' },
-];
-
-const SAFETY_LEVELS = ['none', 'low', 'medium', 'high'] as const;
-
-const MOOD_CARDS = [
-  { id: 'analytical',   label: 'Analytical',   emoji: '🧠', desc: 'Data-driven, precise' },
-  { id: 'professional', label: 'Professional',  emoji: '💼', desc: 'Formal, polished' },
-  { id: 'creative',     label: 'Creative',      emoji: '🎨', desc: 'Imaginative, expressive' },
-  { id: 'urgent',       label: 'Urgent',        emoji: '⚡', desc: 'Direct, action-oriented' },
-] as const;
-
-// ── sub-components ────────────────────────────────────────────────────────────
-
-function Toast({ msg, kind, onDismiss }: { msg: string; kind: 'success' | 'error'; onDismiss: () => void }) {
-  useEffect(() => { const t = setTimeout(onDismiss, kind === 'error' ? 6000 : 4000); return () => clearTimeout(t); }, [kind, onDismiss]);
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -20, x: 20 }}
-      animate={{ opacity: 1, y: 0, x: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className={cn(
-        'fixed top-20 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-xl border shadow-2xl text-sm font-bold font-mono',
-        kind === 'success'
-          ? 'bg-brand-success/10 text-brand-success border-brand-success/30'
-          : 'bg-brand-danger/10 text-brand-danger border-brand-danger/30',
-      )}
-    >
-      {kind === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-      {msg}
-    </motion.div>
-  );
-}
-
-function SliderRow({ label, value, onChange, min = 0, max = 100, step = 1, color = 'brand-primary' }: {
-  label: string; value: number; onChange: (v: number) => void;
-  min?: number; max?: number; step?: number; color?: string;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted font-mono">{label}</span>
-        <span className="text-xs font-bold font-mono text-brand-text">{value}</span>
-      </div>
-      <div className="relative h-2 bg-brand-elevated rounded-full">
-        <div
-          className={cn('absolute left-0 top-0 h-full rounded-full transition-all', `bg-${color}`)}
-          style={{ width: `${((value - min) / (max - min)) * 100}%` }}
-        />
-        <input
-          type="range" min={min} max={max} step={step} value={value}
-          onChange={e => onChange(Number(e.target.value))}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-      </div>
-      <div className="flex justify-between text-[9px] font-mono text-brand-text-muted">
-        <span>{min}</span><span>{max}</span>
-      </div>
-    </div>
-  );
-}
-
-// ── main page ─────────────────────────────────────────────────────────────────
+import { BrainCircuit, Zap, Save, RotateCcw, MessageCircle, Send, Bot, Sparkles } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 export default function AIBrain() {
-  const { restEndpoint, masterToken, setPersonaMood, personaMood } = useStore();
-  const cfg = { restEndpoint, masterToken };
-  const qc = useQueryClient();
+  const { restEndpoint, masterToken } = useStore();
 
-  // ── toast ──────────────────────────────────────────────────────────────────
-  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
-  const showToast = (msg: string, kind: 'success' | 'error' = 'success') => setToast({ msg, kind });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // ── remote data ─────────────────────────────────────────────────────────────
-  const configQ        = useQuery({ queryKey: ['ai-config',        restEndpoint], queryFn: () => fetchAIConfig(cfg),       retry: 1, staleTime: 30_000 });
-  const personaQ       = useQuery({ queryKey: ['ai-persona',       restEndpoint], queryFn: () => fetchPersona(cfg),         retry: 1, staleTime: 30_000 });
-  const personaDirectQ = useQuery({ queryKey: ['persona-direct',   restEndpoint], queryFn: () => fetchPersonaDirect(cfg),  retry: 1, staleTime: 30_000 });
+  // AI Config
+  const [model, setModel] = useState('gemini-2.5-flash');
+  const [chatTemp, setChatTemp] = useState(0.7);
+  const [postTemp, setPostTemp] = useState(0.65);
+  const [safetyLevel, setSafetyLevel] = useState('medium');
+  const [provider, setProvider] = useState('gemini');
 
-  // ── local editable state ────────────────────────────────────────────────────
-  const [model, setModel] = useState('gemini-1.5-pro');
-  // Backend splits temperature into chat/post; the slider edits chat_temperature
-  // and post_temperature is preserved separately so Save doesn't clobber it.
-  const [temperature, setTemperature] = useState(0.7);
-  const [postTemperature, setPostTemperature] = useState(0.7);
-  const [safetyLevel, setSafetyLevel] = useState<string>('medium');
-  const [tone, setTone] = useState(50);
-  const [aggression, setAggression] = useState(30);
-  const [humor, setHumor] = useState(40);
-  const [mood, setMood] = useState<'analytical' | 'professional' | 'creative' | 'urgent'>(personaMood);
+  // Persona
+  const [tone, setTone] = useState(60);
+  const [aggression, setAggression] = useState(70);
+  const [humor, setHumor] = useState(20);
+  const [mood, setMood] = useState('professional');
   const [systemPrompt, setSystemPrompt] = useState('');
-  const [modelDropOpen, setModelDropOpen] = useState(false);
 
-  // Sync remote → local when data arrives
-  useEffect(() => {
-    if (!configQ.data) return;
-    const d = configQ.data;
-    if (d.model) setModel(d.model);
-    if (d.chat_temperature !== undefined) setTemperature(d.chat_temperature);
-    if (d.post_temperature !== undefined) setPostTemperature(d.post_temperature);
-    if (d.safety_level) setSafetyLevel(d.safety_level);
-    if (d.tone_assertiveness !== undefined) setTone(d.tone_assertiveness);
-    if (d.tone_humor !== undefined) setHumor(d.tone_humor);
-    if (d.tone_formality !== undefined) setAggression(d.tone_formality);
-    if (d.persona_mood) setMood(d.persona_mood as 'analytical' | 'professional' | 'creative' | 'urgent');
-    if (d.system_prompt_override) setSystemPrompt(d.system_prompt_override);
-  }, [configQ.data]);
+  // Chat test
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatReply, setChatReply] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const headers = masterToken ? { 'Content-Type': 'application/json', Authorization: `Bearer ${masterToken}` } : {};
+  const base = restEndpoint.replace(/\/+$/, '');
 
   useEffect(() => {
-    if (!personaQ.data) return;
-    const d = personaQ.data;
-    if (d.tone !== undefined) setTone(d.tone);
-    if (d.humor !== undefined) setHumor(d.humor);
-    if (d.aggression !== undefined) setAggression(d.aggression);
-    if (d.model) setModel(d.model);
-    if (d.system_prompt) setSystemPrompt(d.system_prompt);
-  }, [personaQ.data]);
+    const loadConfig = async () => {
+      setLoading(true);
+      try {
+        const [configRes, personaRes] = await Promise.all([
+          fetch(`${base}/ai/config`, { headers }),
+          fetch(`${base}/ai/persona`, { headers }),
+        ]);
 
-  // Sync /persona (direct route) → fills any gaps not covered by /ai/persona
-  useEffect(() => {
-    if (!personaDirectQ.data) return;
-    const d = personaDirectQ.data;
-    if (d.tone      !== undefined && tone      === 50) setTone(d.tone);
-    if (d.humor     !== undefined && humor     === 40) setHumor(d.humor);
-    if (d.aggression !== undefined && aggression === 30) setAggression(d.aggression);
-    if (d.model && model === 'gemini-1.5-pro') setModel(d.model);
-    if (d.system_prompt && !systemPrompt) setSystemPrompt(d.system_prompt);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personaDirectQ.data]);
+        if (configRes.ok) {
+          const d = await configRes.json();
+          if (d.model) setModel(d.model);
+          if (d.chat_temperature !== undefined) setChatTemp(d.chat_temperature);
+          if (d.post_temperature !== undefined) setPostTemp(d.post_temperature);
+          if (d.safety_level) setSafetyLevel(d.safety_level);
+          if (d.provider) setProvider(d.provider);
+        }
 
-  // ── mutations ───────────────────────────────────────────────────────────────
-  const saveConfigMut = useMutation({
-    mutationFn: () => updateAIConfig(cfg, {
-      model,
-      chat_temperature: temperature,
-      post_temperature: postTemperature,
-      safety_level: safetyLevel,
-      tone_assertiveness: tone,
-      tone_humor: humor,
-      tone_formality: aggression,
-      persona_mood: mood,
-      system_prompt_override: systemPrompt,
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['ai-config', restEndpoint] });
-      setPersonaMood(mood);
-      showToast('AI configuration saved successfully.');
-    },
-    onError: (err: Error) => showToast(err?.message || 'Failed to save config.', 'error'),
-  });
-
-  const savePersonaMut = useMutation({
-    mutationFn: () => applyPersona(cfg, { tone, aggression, humor, model, system_prompt: systemPrompt }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['ai-persona', restEndpoint] });
-      showToast('Persona saved.');
-    },
-    onError: (err: Error) => showToast(err?.message || 'Failed to save persona.', 'error'),
-  });
-
-  // Also persist to the direct /persona route
-  const savePersonaDirectMut = useMutation({
-    mutationFn: () => updatePersonaDirect(cfg, { tone, aggression, humor, model, system_prompt: systemPrompt }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['persona-direct', restEndpoint] }),
-    onError: (err: Error) => showToast(err?.message || '/persona sync failed — primary save succeeded.', 'error'),
-  });
-
-  interface ResetPersonaResponse {
-    persona?: {
-      tone?: number;
-      humor?: number;
-      aggression?: number;
-      model?: string;
-      system_prompt?: string;
-    };
-  }
-
-  const resetMut = useMutation({
-    mutationFn: () => resetPersona(cfg),
-    onSuccess: (res: ResetPersonaResponse) => {
-      if (res?.persona) {
-        const p = res.persona;
-        if (p.tone !== undefined) setTone(p.tone);
-        if (p.humor !== undefined) setHumor(p.humor);
-        if (p.aggression !== undefined) setAggression(p.aggression);
-        if (p.model) setModel(p.model);
-        if (p.system_prompt) setSystemPrompt(p.system_prompt);
+        if (personaRes.ok) {
+          const d = await personaRes.json();
+          if (d.tone !== undefined) setTone(d.tone);
+          if (d.aggression !== undefined) setAggression(d.aggression);
+          if (d.humor !== undefined) setHumor(d.humor);
+          if (d.persona_mood) setMood(d.persona_mood);
+          if (d.system_prompt) setSystemPrompt(d.system_prompt);
+        }
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-      qc.invalidateQueries({ queryKey: ['ai-persona', restEndpoint] });
-      qc.invalidateQueries({ queryKey: ['ai-config', restEndpoint] });
-      showToast('Persona reset to defaults.');
-    },
-    onError: (err: Error) => showToast(err?.message || 'Failed to reset persona.', 'error'),
-  });
+    };
+    loadConfig();
+  }, [restEndpoint]);
 
-  // ── chat ─────────────────────────────────────────────────────────────────
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  const chatMut = useMutation({
-    mutationFn: (msg: string) => chatWithAI(cfg, msg),
-    onSuccess: (res: Record<string, unknown>, msg: string) => {
-      const reply = (res?.response as string) || (res?.reply as string) || '(no response)';
-      setChatMessages(prev => [...prev, { role: 'user', text: msg }, { role: 'ai', text: reply }]);
-      setChatInput('');
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-    },
-    onError: (err: Error) => showToast(err?.message || 'Chat failed.', 'error'),
-  });
-
-  const handleChat = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || chatMut.isPending) return;
-    chatMut.mutate(chatInput.trim());
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveSuccess(false);
+    try {
+      await Promise.all([
+        fetch(`${base}/ai/config`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            model,
+            chat_temperature: chatTemp,
+            post_temperature: postTemp,
+            safety_level: safetyLevel,
+            provider,
+          }),
+        }),
+        fetch(`${base}/ai/persona`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            tone,
+            aggression,
+            humor,
+            persona_mood: mood,
+            system_prompt: systemPrompt || null,
+          }),
+        }),
+      ]);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setError('Save failed');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const isLoading = configQ.isLoading || personaQ.isLoading;
-  const activeModel = MODEL_OPTIONS.find(m => m.id === model) ?? MODEL_OPTIONS[0];
-  const isSaving = saveConfigMut.isPending || savePersonaMut.isPending;
+  const handleReset = async () => {
+    try {
+      await fetch(`${base}/persona/reset`, { method: 'POST', headers });
+      setTone(60);
+      setAggression(70);
+      setHumor(20);
+      setMood('professional');
+      setSystemPrompt('');
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setError('Reset failed');
+    }
+  };
+
+  const handleChat = async () => {
+    if (!chatMessage.trim()) return;
+    setChatLoading(true);
+    try {
+      const res = await fetch(`${base}/ai/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ message: chatMessage }),
+      });
+      const d = await res.json();
+      setChatReply(d.reply || 'No response');
+    } catch (err) {
+      setChatReply('Chat failed. Check your Gemini key.');
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const moods = [
+    { key: 'analytical', label: 'Analytical', color: 'bg-brand-accent/10 text-brand-accent border-brand-accent/30' },
+    { key: 'professional', label: 'Professional', color: 'bg-brand-primary/10 text-brand-primary border-brand-primary/30' },
+    { key: 'creative', label: 'Creative', color: 'bg-brand-warning/10 text-brand-warning border-brand-warning/30' },
+    { key: 'urgent', label: 'Urgent', color: 'bg-brand-danger/10 text-brand-danger border-brand-danger/30' },
+  ];
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 bg-brand-elevated rounded w-48" />
+        <div className="h-64 bg-brand-surface border border-brand-border rounded-2xl" />
+      </div>
+    );
+  }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-24">
-      {/* Toast */}
-      <AnimatePresence>
-        {toast && <Toast key="toast" msg={toast.msg} kind={toast.kind} onDismiss={() => setToast(null)} />}
-      </AnimatePresence>
-
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-20 md:pb-0 max-w-4xl">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-brand-border">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center gap-3">
-            <BrainCircuit className="w-8 h-8 text-brand-primary" />
+          <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-tight flex items-center">
+            <BrainCircuit className="w-8 h-8 mr-3 text-brand-primary" />
             AI Brain
           </h1>
-          <p className="text-brand-text-muted text-sm font-mono mt-1 uppercase tracking-widest">Cognitive Engine Configuration</p>
+          <p className="text-brand-text-muted text-sm font-mono mt-1">COGNITIVE ENGINE CONFIGURATION</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => { configQ.refetch(); personaQ.refetch(); personaDirectQ.refetch(); }}
-            className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-colors"
+            onClick={handleReset}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-elevated border border-brand-border rounded-xl text-sm font-bold uppercase tracking-wider text-brand-text-muted hover:text-brand-text transition-all"
           >
-            <RefreshCw className={cn('w-4 h-4', (configQ.isFetching || personaQ.isFetching) && 'animate-spin')} />
+            <RotateCcw className="w-4 h-4" /> Reset Defaults
           </button>
           <button
-            onClick={() => resetMut.mutate()}
-            disabled={resetMut.isPending}
-            className="px-4 py-2.5 bg-brand-elevated border border-brand-border rounded-xl text-xs font-bold uppercase tracking-wider text-brand-text-muted hover:text-brand-danger hover:border-brand-danger/40 transition-colors flex items-center gap-2 disabled:opacity-50"
+            onClick={handleSave}
+            disabled={saving}
+            className={cn(
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all",
+              saveSuccess
+                ? "bg-brand-success text-white"
+                : "bg-brand-primary text-white hover:bg-brand-primary/90 shadow-glow-primary"
+            )}
           >
-            {resetMut.isPending ? <Spinner size={14} /> : <RotateCcw className="w-4 h-4" />}
-            Reset Defaults
-          </button>
-          <button
-            onClick={() => { saveConfigMut.mutate(); savePersonaMut.mutate(); savePersonaDirectMut.mutate(); }}
-            disabled={isSaving || isLoading}
-            className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-brand-primary/90 transition-colors shadow-glow-primary flex items-center gap-2 disabled:opacity-50"
-          >
-            {isSaving ? <Spinner size={14} /> : <Check className="w-4 h-4" />}
-            Save All
+            {saving ? 'Saving...' : saveSuccess ? 'Saved!' : <><Save className="w-4 h-4" /> Save All</>}
           </button>
         </div>
       </div>
 
-      {isLoading && (
+      {error && (
+        <div className="p-4 bg-brand-danger/5 border border-brand-danger/20 rounded-xl text-xs text-brand-danger font-mono">
+          {error}
+        </div>
+      )}
+
+      {/* Model & Temperature */}
+      <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 space-y-6">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text flex items-center gap-2">
+          <Zap className="w-4 h-4 text-brand-primary" /> Model Configuration
+        </h2>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-brand-elevated animate-pulse rounded-2xl h-40 border border-brand-border" />
+          <div>
+            <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted mb-2">Active Model</label>
+            <select value={model} onChange={e => setModel(e.target.value)}
+              className="w-full bg-brand-elevated border border-brand-border rounded-xl px-4 py-3 text-sm text-brand-text font-bold focus:outline-none focus:border-brand-primary cursor-pointer">
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted mb-2">Safety Level</label>
+            <select value={safetyLevel} onChange={e => setSafetyLevel(e.target.value)}
+              className="w-full bg-brand-elevated border border-brand-border rounded-xl px-4 py-3 text-sm text-brand-text font-bold focus:outline-none focus:border-brand-primary cursor-pointer">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted mb-2">
+              Chat Temperature: {chatTemp.toFixed(1)}
+            </label>
+            <input type="range" min="0" max="2" step="0.1" value={chatTemp} onChange={e => setChatTemp(parseFloat(e.target.value))}
+              className="w-full accent-brand-primary" />
+            <div className="flex justify-between text-[9px] text-brand-text-muted font-mono mt-1">
+              <span>Precise (0.0)</span><span>Creative (2.0)</span>
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted mb-2">
+              Post Temperature: {postTemp.toFixed(1)}
+            </label>
+            <input type="range" min="0" max="2" step="0.1" value={postTemp} onChange={e => setPostTemp(parseFloat(e.target.value))}
+              className="w-full accent-brand-primary" />
+            <div className="flex justify-between text-[9px] text-brand-text-muted font-mono mt-1">
+              <span>Precise (0.0)</span><span>Creative (2.0)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Personality Sliders */}
+      <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 space-y-6">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-brand-accent" /> Personality Matrix
+        </h2>
+
+        <div className="space-y-5">
+          {[
+            { label: 'Tone', value: tone, setter: setTone, left: 'Formal', right: 'Casual' },
+            { label: 'Assertiveness', value: aggression, setter: setAggression, left: 'Passive', right: 'Assertive' },
+            { label: 'Humor', value: humor, setter: setHumor, left: 'Serious', right: 'Playful' },
+          ].map(slider => (
+            <div key={slider.label}>
+              <div className="flex justify-between mb-2">
+                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted">{slider.label}</label>
+                <span className="text-xs font-mono font-bold text-brand-text">{slider.value}%</span>
+              </div>
+              <input type="range" min="0" max="100" value={slider.value} onChange={e => slider.setter(parseInt(e.target.value))}
+                className="w-full accent-brand-primary" />
+              <div className="flex justify-between text-[9px] text-brand-text-muted font-mono mt-1">
+                <span>{slider.left}</span><span>{slider.right}</span>
+              </div>
+            </div>
           ))}
         </div>
-      )}
 
-      {(configQ.isError || personaQ.isError) && !isLoading && (
-        <div className="p-4 bg-brand-warning/10 border border-brand-warning/30 rounded-xl text-brand-warning text-sm font-mono flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          Could not load AI config from backend — editing local values only.
-        </div>
-      )}
-
-      {!isLoading && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-          {/* ── Model Selector ─────────────────────────────────────────────── */}
-          <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Cpu className="w-5 h-5 text-brand-primary" />
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">Active Model</h2>
-            </div>
-
-            <div className="relative">
-              <button
-                onClick={() => setModelDropOpen(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-brand-elevated border border-brand-border rounded-xl text-sm text-brand-text font-bold hover:border-brand-primary/40 transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-brand-success animate-pulse" />
-                  {activeModel.name}
-                  <span className="text-[10px] font-mono text-brand-text-muted">{activeModel.provider}</span>
-                </span>
-                <ChevronDown className={cn('w-4 h-4 text-brand-text-muted transition-transform', modelDropOpen && 'rotate-180')} />
-              </button>
-              <AnimatePresence>
-                {modelDropOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    className="absolute z-20 top-full mt-1 w-full bg-brand-surface border border-brand-border rounded-xl shadow-2xl overflow-hidden"
-                  >
-                    {MODEL_OPTIONS.map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => { setModel(m.id); setModelDropOpen(false); }}
-                        className={cn(
-                          'w-full flex items-center justify-between px-4 py-3 text-left hover:bg-brand-elevated transition-colors',
-                          model === m.id && 'bg-brand-primary/10 text-brand-primary',
-                        )}
-                      >
-                        <div>
-                          <div className="text-sm font-bold">{m.name}</div>
-                          <div className="text-[10px] font-mono text-brand-text-muted">{m.provider} · {m.ctx}</div>
-                        </div>
-                        {model === m.id && <Check className="w-4 h-4 text-brand-primary" />}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Temperature */}
-            <SliderRow
-              label={`Temperature — ${temperature.toFixed(2)}`}
-              value={temperature}
-              onChange={setTemperature}
-              min={0} max={2} step={0.01}
-              color="brand-accent"
-            />
-
-            {/* Safety */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Shield className="w-3.5 h-3.5 text-brand-text-muted" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted font-mono">Safety Level</span>
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {SAFETY_LEVELS.map(lvl => (
-                  <button
-                    key={lvl}
-                    onClick={() => setSafetyLevel(lvl)}
-                    className={cn(
-                      'py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-colors',
-                      safetyLevel === lvl
-                        ? 'bg-brand-primary/20 border-brand-primary text-brand-primary'
-                        : 'bg-brand-elevated border-brand-border text-brand-text-muted hover:border-brand-primary/30',
-                    )}
-                  >
-                    {lvl}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Personality Sliders ─────────────────────────────────────────── */}
-          <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 space-y-5">
-            <div className="flex items-center gap-2 mb-2">
-              <Sliders className="w-5 h-5 text-brand-accent" />
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">Personality Matrix</h2>
-            </div>
-            <SliderRow label="Tone Assertiveness" value={tone} onChange={setTone} color="brand-primary" />
-            <SliderRow label="Aggression" value={aggression} onChange={setAggression} color="brand-danger" />
-            <SliderRow label="Humor" value={humor} onChange={setHumor} color="brand-warning" />
-          </div>
-
-          {/* ── Mood Selector ───────────────────────────────────────────────── */}
-          <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5 text-brand-warning" />
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">Persona Mood</h2>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {MOOD_CARDS.map(m => (
-                <button
-                  key={m.id}
-                  onClick={() => setMood(m.id)}
-                  className={cn(
-                    'p-4 rounded-2xl border text-left transition-all',
-                    mood === m.id
-                      ? 'bg-brand-primary/10 border-brand-primary shadow-glow-primary'
-                      : 'bg-brand-elevated border-brand-border hover:border-brand-primary/30',
-                  )}
-                >
-                  <div className="text-2xl mb-2">{m.emoji}</div>
-                  <div className="text-xs font-bold text-brand-text uppercase tracking-wider">{m.label}</div>
-                  <div className="text-[10px] text-brand-text-muted font-mono mt-0.5">{m.desc}</div>
-                  {mood === m.id && <div className="mt-2 w-2 h-2 rounded-full bg-brand-primary" />}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ── System Prompt ───────────────────────────────────────────────── */}
-          <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col">
-            <div className="flex items-center gap-2 mb-4">
-              <Settings2 className="w-5 h-5 text-brand-text-muted" />
-              <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">System Prompt Override</h2>
-            </div>
-            <textarea
-              value={systemPrompt}
-              onChange={e => setSystemPrompt(e.target.value)}
-              rows={8}
-              placeholder="Enter a custom system prompt to override the default AI instructions..."
-              className="flex-1 w-full bg-brand-elevated border border-brand-border rounded-xl px-4 py-3 text-xs text-brand-text font-mono focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 resize-none"
-            />
-            <p className="text-[10px] text-brand-text-muted font-mono mt-2">
-              {systemPrompt.length} chars · Leave blank to use default system prompt
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Test Chat ──────────────────────────────────────────────────────────── */}
-      {!isLoading && (
-        <div className="bg-brand-surface border border-brand-border rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-brand-border bg-brand-elevated flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-brand-accent" />
-            <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text">Live Chat Test</h2>
-            <span className="ml-auto text-[10px] font-mono text-brand-text-muted uppercase">POST /ai/chat</span>
-          </div>
-
-          {/* Messages */}
-          <div className="h-64 overflow-y-auto p-4 space-y-3 bg-brand-bg/40">
-            {chatMessages.length === 0 && (
-              <div className="h-full flex flex-col items-center justify-center text-brand-text-muted">
-                <Bot className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-xs font-mono uppercase">Send a message to test the live AI</p>
-              </div>
-            )}
-            {chatMessages.map((m, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}
-              >
-                <div className={cn(
-                  'max-w-[75%] px-4 py-3 rounded-xl text-xs leading-relaxed border',
-                  m.role === 'user'
-                    ? 'bg-brand-primary border-brand-primary/40 text-white rounded-tr-none'
-                    : 'bg-brand-elevated border-brand-border text-brand-text rounded-tl-none',
+        {/* Mood Selector */}
+        <div>
+          <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted mb-3">Active Mood</label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {moods.map(m => (
+              <button key={m.key} onClick={() => setMood(m.key)}
+                className={cn(
+                  "p-3 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all text-center",
+                  mood === m.key ? m.color + ' border-current' : 'bg-brand-elevated border-brand-border text-brand-text-muted hover:border-brand-primary/30'
                 )}>
-                  {m.text}
-                </div>
-              </motion.div>
+                {m.label}
+              </button>
             ))}
-            {chatMut.isPending && (
-              <div className="flex justify-start">
-                <div className="bg-brand-elevated border border-brand-border px-4 py-3 rounded-xl rounded-tl-none flex items-center gap-2 text-xs text-brand-text-muted">
-                  <Spinner size={12} /> Thinking…
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
           </div>
-
-          {/* Input */}
-          <form onSubmit={handleChat} className="p-4 border-t border-brand-border bg-brand-elevated/20 flex items-center gap-3">
-            <input
-              type="text"
-              placeholder="Type a test message…"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              disabled={chatMut.isPending}
-              className="flex-1 bg-brand-elevated border border-brand-border rounded-xl px-4 py-2.5 text-xs text-brand-text font-mono focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 disabled:opacity-60"
-            />
-            <button
-              type="submit"
-              disabled={chatMut.isPending || !chatInput.trim()}
-              className="p-2.5 bg-brand-primary text-white rounded-xl hover:bg-brand-primary/90 transition-colors shadow-glow-primary disabled:opacity-50 flex items-center justify-center"
-            >
-              {chatMut.isPending ? <Spinner size={14} /> : <Send className="w-4 h-4" />}
-            </button>
-          </form>
         </div>
-      )}
+
+        {/* System Prompt */}
+        <div>
+          <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted mb-2">System Prompt Override</label>
+          <textarea value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)}
+            placeholder="Custom system instructions for the AI..."
+            rows={3}
+            className="w-full bg-brand-elevated border border-brand-border rounded-xl px-4 py-3 text-sm text-brand-text font-mono placeholder-brand-text-muted/40 focus:outline-none focus:border-brand-primary resize-none" />
+        </div>
+      </div>
+
+      {/* Test Chat */}
+      <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 space-y-4">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-brand-success" /> Test Chat
+        </h2>
+        <div className="flex gap-2">
+          <input type="text" value={chatMessage} onChange={e => setChatMessage(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleChat()}
+            placeholder="Type a test message..."
+            className="flex-1 bg-brand-elevated border border-brand-border rounded-xl px-4 py-3 text-sm text-brand-text placeholder-brand-text-muted/40 focus:outline-none focus:border-brand-primary" />
+          <button onClick={handleChat} disabled={chatLoading || !chatMessage.trim()}
+            className="px-4 py-3 bg-brand-primary text-white rounded-xl hover:bg-brand-primary/90 transition-all disabled:opacity-50 flex items-center gap-2">
+            {chatLoading ? <Bot className="w-4 h-4 animate-pulse" /> : <Send className="w-4 h-4" />}
+          </button>
+        </div>
+        {chatReply && (
+          <div className="p-4 bg-brand-elevated border border-brand-border rounded-xl">
+            <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted mb-2">AI Response</p>
+            <p className="text-sm text-brand-text">{chatReply}</p>
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 }
