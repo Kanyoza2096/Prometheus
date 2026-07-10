@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useStore } from '../store/useStore';
-import { BrainCircuit, Zap, Save, RotateCcw, MessageCircle, Send, Bot, Sparkles } from 'lucide-react';
+import { BrainCircuit, Zap, Save, RotateCcw, MessageCircle, Send, Bot, Sparkles, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function AIBrain() {
-  const { restEndpoint, masterToken } = useStore();
+  const { restEndpoint, masterToken, setPersonaMood, personaMood } = useStore();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // AI Config
+  // AI Config — dynamic from backend
   const [model, setModel] = useState('gemini-2.5-flash');
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableProviders, setAvailableProviders] = useState<string[]>([]);
   const [chatTemp, setChatTemp] = useState(0.7);
   const [postTemp, setPostTemp] = useState(0.65);
   const [safetyLevel, setSafetyLevel] = useState('medium');
@@ -23,7 +25,8 @@ export default function AIBrain() {
   const [tone, setTone] = useState(60);
   const [aggression, setAggression] = useState(70);
   const [humor, setHumor] = useState(20);
-  const [mood, setMood] = useState('professional');
+  const [mood, setMood] = useState(personaMood || 'professional');
+  const [availableMoods, setAvailableMoods] = useState<string[]>([]);
   const [systemPrompt, setSystemPrompt] = useState('');
 
   // Chat test
@@ -46,6 +49,8 @@ export default function AIBrain() {
         if (configRes.ok) {
           const d = await configRes.json();
           if (d.model) setModel(d.model);
+          if (d.available_models) setAvailableModels(d.available_models);
+          if (d.available_providers) setAvailableProviders(d.available_providers);
           if (d.chat_temperature !== undefined) setChatTemp(d.chat_temperature);
           if (d.post_temperature !== undefined) setPostTemp(d.post_temperature);
           if (d.safety_level) setSafetyLevel(d.safety_level);
@@ -58,6 +63,7 @@ export default function AIBrain() {
           if (d.aggression !== undefined) setAggression(d.aggression);
           if (d.humor !== undefined) setHumor(d.humor);
           if (d.persona_mood) setMood(d.persona_mood);
+          if (d.available_moods) setAvailableMoods(d.available_moods);
           if (d.system_prompt) setSystemPrompt(d.system_prompt);
         }
       } catch (err: any) {
@@ -97,6 +103,7 @@ export default function AIBrain() {
           }),
         }),
       ]);
+      setPersonaMood(mood as any);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
@@ -108,12 +115,17 @@ export default function AIBrain() {
 
   const handleReset = async () => {
     try {
-      await fetch(`${base}/persona/reset`, { method: 'POST', headers });
-      setTone(60);
-      setAggression(70);
-      setHumor(20);
-      setMood('professional');
-      setSystemPrompt('');
+      const res = await fetch(`${base}/persona/reset`, { method: 'POST', headers });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.persona) {
+          if (d.persona.tone !== undefined) setTone(d.persona.tone);
+          if (d.persona.aggression !== undefined) setAggression(d.persona.aggression);
+          if (d.persona.humor !== undefined) setHumor(d.persona.humor);
+          if (d.persona.mood) setMood(d.persona.mood);
+          if (d.persona.system_prompt !== undefined) setSystemPrompt(d.persona.system_prompt || '');
+        }
+      }
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
@@ -124,6 +136,7 @@ export default function AIBrain() {
   const handleChat = async () => {
     if (!chatMessage.trim()) return;
     setChatLoading(true);
+    setChatReply('');
     try {
       const res = await fetch(`${base}/ai/chat`, {
         method: 'POST',
@@ -139,12 +152,27 @@ export default function AIBrain() {
     }
   };
 
-  const moods = [
-    { key: 'analytical', label: 'Analytical', color: 'bg-brand-accent/10 text-brand-accent border-brand-accent/30' },
-    { key: 'professional', label: 'Professional', color: 'bg-brand-primary/10 text-brand-primary border-brand-primary/30' },
-    { key: 'creative', label: 'Creative', color: 'bg-brand-warning/10 text-brand-warning border-brand-warning/30' },
-    { key: 'urgent', label: 'Urgent', color: 'bg-brand-danger/10 text-brand-danger border-brand-danger/30' },
+  const moodCards = [
+    { key: 'analytical', label: 'Analytical', emoji: '🧠', color: 'bg-brand-accent/10 text-brand-accent border-brand-accent/30' },
+    { key: 'professional', label: 'Professional', emoji: '💼', color: 'bg-brand-primary/10 text-brand-primary border-brand-primary/30' },
+    { key: 'creative', label: 'Creative', emoji: '🎨', color: 'bg-brand-warning/10 text-brand-warning border-brand-warning/30' },
+    { key: 'urgent', label: 'Urgent', emoji: '⚡', color: 'bg-brand-danger/10 text-brand-danger border-brand-danger/30' },
   ];
+
+  // Filter mood cards to only show available moods from backend
+  const filteredMoodCards = availableMoods.length > 0
+    ? moodCards.filter(m => availableMoods.includes(m.key))
+    : moodCards;
+
+  const modelLabel = (id: string) => {
+    const map: Record<string, string> = {
+      'gemini-2.5-flash': 'Gemini 2.5 Flash',
+      'gemini-2.5-pro': 'Gemini 2.5 Pro',
+      'gemini-1.5-pro': 'Gemini 1.5 Pro',
+      'gemini-1.5-flash': 'Gemini 1.5 Flash',
+    };
+    return map[id] || id;
+  };
 
   if (loading) {
     return (
@@ -167,31 +195,21 @@ export default function AIBrain() {
           <p className="text-brand-text-muted text-sm font-mono mt-1">COGNITIVE ENGINE CONFIGURATION</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-elevated border border-brand-border rounded-xl text-sm font-bold uppercase tracking-wider text-brand-text-muted hover:text-brand-text transition-all"
-          >
+          <button onClick={handleReset} className="flex items-center gap-2 px-4 py-2.5 bg-brand-elevated border border-brand-border rounded-xl text-sm font-bold uppercase tracking-wider text-brand-text-muted hover:text-brand-text transition-all">
             <RotateCcw className="w-4 h-4" /> Reset Defaults
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
+          <button onClick={handleSave} disabled={saving}
             className={cn(
               "flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all",
-              saveSuccess
-                ? "bg-brand-success text-white"
-                : "bg-brand-primary text-white hover:bg-brand-primary/90 shadow-glow-primary"
-            )}
-          >
+              saveSuccess ? "bg-brand-success text-white" : "bg-brand-primary text-white hover:bg-brand-primary/90 shadow-glow-primary"
+            )}>
             {saving ? 'Saving...' : saveSuccess ? 'Saved!' : <><Save className="w-4 h-4" /> Save All</>}
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 bg-brand-danger/5 border border-brand-danger/20 rounded-xl text-xs text-brand-danger font-mono">
-          {error}
-        </div>
+        <div className="p-4 bg-brand-danger/5 border border-brand-danger/20 rounded-xl text-xs text-brand-danger font-mono">{error}</div>
       )}
 
       {/* Model & Temperature */}
@@ -205,11 +223,22 @@ export default function AIBrain() {
             <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted mb-2">Active Model</label>
             <select value={model} onChange={e => setModel(e.target.value)}
               className="w-full bg-brand-elevated border border-brand-border rounded-xl px-4 py-3 text-sm text-brand-text font-bold focus:outline-none focus:border-brand-primary cursor-pointer">
-              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+              {availableModels.length > 0 ? (
+                availableModels.map(m => (
+                  <option key={m} value={m}>{modelLabel(m)}</option>
+                ))
+              ) : (
+                <>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                  <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                </>
+              )}
             </select>
+            {availableModels.length > 0 && (
+              <p className="text-[9px] text-brand-text-muted font-mono mt-1">{availableModels.length} models available</p>
+            )}
           </div>
 
           <div>
@@ -273,20 +302,24 @@ export default function AIBrain() {
           ))}
         </div>
 
-        {/* Mood Selector */}
+        {/* Mood Selector — filtered by available moods from backend */}
         <div>
           <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted mb-3">Active Mood</label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {moods.map(m => (
+            {filteredMoodCards.map(m => (
               <button key={m.key} onClick={() => setMood(m.key)}
                 className={cn(
-                  "p-3 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all text-center",
+                  "p-4 rounded-xl border text-left transition-all",
                   mood === m.key ? m.color + ' border-current' : 'bg-brand-elevated border-brand-border text-brand-text-muted hover:border-brand-primary/30'
                 )}>
-                {m.label}
+                <div className="text-2xl mb-1">{m.emoji}</div>
+                <div className="text-xs font-bold uppercase tracking-wider">{m.label}</div>
               </button>
             ))}
           </div>
+          {availableMoods.length > 0 && (
+            <p className="text-[9px] text-brand-text-muted font-mono mt-2">{availableMoods.length} moods available</p>
+          )}
         </div>
 
         {/* System Prompt */}
