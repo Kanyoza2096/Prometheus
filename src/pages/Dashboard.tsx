@@ -8,7 +8,7 @@ import {
   Users, Briefcase, Workflow, ListTodo, AlertCircle,
   FileText, ShieldAlert, LayoutDashboard, TrendingUp,
   Network, DollarSign, BarChart3, Sparkles, Clock,
-  BrainCircuit, ChevronRight
+  BrainCircuit, ChevronRight, Hexagon, ArrowUpRight
 } from 'lucide-react';
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -17,7 +17,10 @@ import {
 import { cn } from '../lib/utils';
 import SystemTopology from '../components/SystemTopology';
 
-// ─── Animated Counter ───
+// ═══════════════════════════════════════════════════════════════════════════
+// ANIMATED SUB-COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════
+
 const AnimatedNumber = ({ value, duration = 800 }: { value: number; duration?: number }) => {
   const [display, setDisplay] = React.useState(0);
   React.useEffect(() => {
@@ -33,42 +36,67 @@ const AnimatedNumber = ({ value, duration = 800 }: { value: number; duration?: n
   return <span>{display.toLocaleString()}</span>;
 };
 
-// ─── Pulse Dot ───
-const PulseDot = ({ color }: { color: string }) => (
-  <span className="relative flex h-2 h-2">
+const PulseDot = ({ color, size = 'md' }: { color: string; size?: 'sm' | 'md' }) => (
+  <span className={cn("relative flex", size === 'sm' ? 'h-2 w-2' : 'h-2.5 w-2.5')}>
     <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: color }} />
-    <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: color }} />
+    <span className="relative inline-flex rounded-full h-full w-full" style={{ backgroundColor: color }} />
   </span>
 );
 
-// ─── Radial Health Gauge ───
-const HealthRadial = ({ value, size = 60, strokeWidth = 5, color }: { value: number; size?: number; strokeWidth?: number; color: string }) => {
+const SpinningGlobe = () => (
+  <motion.div
+    animate={{ rotate: 360 }}
+    transition={{ repeat: Infinity, duration: 20, ease: 'linear' }}
+    className="absolute -top-6 -right-6 opacity-[0.06] pointer-events-none"
+  >
+    <Hexagon className="w-32 h-32 text-brand-primary" />
+  </motion.div>
+);
+
+const FloatingOrb = ({ color, size, x, y, delay = 0 }: { color: string; size: number; x: string; y: string; delay?: number }) => (
+  <motion.div
+    className="absolute rounded-full blur-2xl pointer-events-none"
+    style={{ width: size, height: size, left: x, top: y, backgroundColor: color }}
+    animate={{ 
+      scale: [1, 1.3, 1],
+      opacity: [0.08, 0.15, 0.08],
+    }}
+    transition={{ repeat: Infinity, duration: 6, delay, ease: 'easeInOut' }}
+  />
+);
+
+const HealthRadial = ({ value, size = 52, strokeWidth = 4, color }: { value: number; size?: number; strokeWidth?: number; color: string }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (value / 100) * circumference;
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="transform -rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={radius} stroke="currentColor" strokeWidth={strokeWidth} fill="none" className="text-brand-elevated" />
-        <circle cx={size / 2} cy={size / 2} r={radius} stroke={color} strokeWidth={strokeWidth} fill="none"
-          strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
-          className="transition-all duration-1000 ease-out" />
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke="currentColor" strokeWidth={strokeWidth} fill="none" className="text-brand-elevated/50" />
+        <motion.circle
+          cx={size / 2} cy={size / 2} r={radius}
+          stroke={color} strokeWidth={strokeWidth} fill="none"
+          strokeDasharray={circumference} strokeDashoffset={circumference}
+          strokeLinecap="round"
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 1.5, ease: 'easeOut' }}
+        />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-[10px] font-bold" style={{ color }}>{Math.round(value)}%</span>
+        <span className="text-[10px] font-bold font-mono" style={{ color }}>{Math.round(value)}%</span>
       </div>
     </div>
   );
 };
 
-// ─── Chart Tooltip ───
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-brand-elevated border border-brand-border p-3 shadow-lg">
-        <p className="text-brand-text-muted text-xs font-mono mb-2">{label}</p>
+      <div className="bg-brand-surface border border-brand-border/60 p-3 rounded-xl shadow-2xl backdrop-blur-sm">
+        <p className="text-brand-text-muted text-[10px] font-mono mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
-          <p key={index} className="text-sm font-bold font-mono" style={{ color: entry.color }}>
+          <p key={index} className="text-xs font-bold font-mono" style={{ color: entry.color }}>
             {entry.name}: {entry.value}
           </p>
         ))}
@@ -78,7 +106,56 @@ const ChartTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const COLORS = ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+const MetricCard = ({ icon: Icon, label, value, color, delay = 0 }: { icon: any; label: string; value: string; color: string; delay?: number }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 12 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay, ease: 'easeOut' }}
+    whileHover={{ scale: 1.02, y: -2 }}
+    className="bg-brand-surface border border-brand-border p-4 rounded-2xl flex flex-col gap-2 hover:border-brand-primary/30 transition-all relative overflow-hidden group cursor-pointer"
+  >
+    <FloatingOrb color={color} size={40} x="60%" y="-20%" delay={delay} />
+    <div className="flex justify-between items-start relative z-10">
+      <span className="text-[9px] uppercase font-bold text-brand-text-muted tracking-widest leading-tight w-2/3">{label}</span>
+      <motion.div
+        whileHover={{ rotate: [0, -10, 10, 0] }}
+        transition={{ duration: 0.5 }}
+        className={cn("p-1.5 rounded-lg bg-brand-elevated/50", color.replace('text-', 'bg-').replace('brand-', 'brand-') + '/10')}
+      >
+        <Icon className={cn("w-4 h-4", color)} />
+      </motion.div>
+    </div>
+    <span className={cn("text-lg font-mono font-bold tracking-tight truncate relative z-10", color)}>{value}</span>
+  </motion.div>
+);
+
+const SystemMetricCard = ({ icon: Icon, label, value, color, delay = 0 }: { icon: any; label: string; value: string; color: string; delay?: number }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 12 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay, ease: 'easeOut' }}
+    whileHover={{ scale: 1.03, borderColor: '#4F46E5' }}
+    className="bg-brand-surface border border-brand-border p-4 rounded-2xl flex items-center gap-4 hover:bg-brand-elevated/50 transition-all cursor-pointer group"
+  >
+    <motion.div
+      whileHover={{ rotate: 360 }}
+      transition={{ duration: 0.8, ease: 'easeInOut' }}
+      className={cn("p-2.5 rounded-xl bg-brand-elevated border border-brand-border group-hover:border-brand-primary/30 transition-colors", color)}
+    >
+      <Icon className="w-4 h-4" />
+    </motion.div>
+    <div className="overflow-hidden">
+      <div className="text-[9px] uppercase font-bold text-brand-text-muted tracking-widest truncate">{label}</div>
+      <div className="text-lg font-mono font-bold text-brand-text leading-tight">{value}</div>
+    </div>
+  </motion.div>
+);
+
+const COLORS = ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -88,58 +165,23 @@ export default function Dashboard() {
   const totalServices = healthMatrix.length || 7;
   const systemHealth = totalServices > 0 ? Math.round((onlineServices / totalServices) * 100) : 100;
 
-  // Retrieve current task and tenant stats to keep counts completely aligned and dynamic
-  const persistedTasks = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('kanyoza_tasks');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [
-      { id: 1, title: 'Complete project documentation', status: 'todo' },
-      { id: 2, title: 'Review pull requests', status: 'in-progress' },
-      { id: 3, title: 'Design new dashboard', status: 'done' },
-      { id: 4, title: 'Client onboarding', status: 'todo' },
-      { id: 5, title: 'Update API documentation', status: 'in-progress' },
-      { id: 6, title: 'Testing and QA', status: 'todo' },
-    ];
-  }, []);
-
-  const persistedTenants = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('kanyoza_tenants');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [
-      { id: 1, name: 'Kanyoza Systems', plan: 'Enterprise', status: 'Active' },
-      { id: 2, name: 'TechHub Malawi', plan: 'Business', status: 'Active' },
-      { id: 3, name: 'Ministry of Education', plan: 'Enterprise', status: 'Active' },
-      { id: 4, name: 'Blantyre Diocese', plan: 'Business', status: 'Active' },
-      { id: 5, name: 'Malawi Revenue Authority', plan: 'Enterprise', status: 'Trial' },
-      { id: 6, name: 'HealthPlus Hospital', plan: 'Business', status: 'Suspended' },
-    ];
-  }, []);
-
   const conversationData = useMemo(() => {
-    const baseVal = stats.messagesToday || 1240;
-    return Array.from({ length: 30 }, (_, i) => {
-      const multiplier = 0.85 + Math.sin(i / 4.2) * 0.15 + (i / 150);
-      return {
-        day: `Day ${i + 1}`,
-        conversations: Math.round(baseVal * multiplier),
-      };
-    });
+    const baseVal = stats.messagesToday || 0;
+    if (baseVal === 0) return [];
+    return Array.from({ length: 30 }, (_, i) => ({
+      day: `D${i + 1}`,
+      conversations: Math.round(baseVal * (0.7 + Math.sin(i / 5) * 0.3)),
+    }));
   }, [stats.messagesToday]);
 
   const postsData = useMemo(() => {
-    const dailyBase = stats.postsPublished || 15;
-    return Array.from({ length: 7 }, (_, i) => {
-      const dayFactor = 0.85 + (i * 0.08) % 0.4;
-      return {
-        name: `Day ${i + 1}`,
-        daily: Math.round(dailyBase * dayFactor),
-        monthly: Math.round(dailyBase * 12 + (i * 24)),
-      };
-    });
+    const dailyBase = stats.postsPublished || 0;
+    if (dailyBase === 0) return [];
+    return Array.from({ length: 7 }, (_, i) => ({
+      name: `D${i + 1}`,
+      daily: Math.round(dailyBase * (0.7 + Math.random() * 0.3)),
+      monthly: Math.round(dailyBase * 10 * (0.8 + Math.random() * 0.2)),
+    }));
   }, [stats.postsPublished]);
 
   const platformData = useMemo(() => {
@@ -153,270 +195,243 @@ export default function Dashboard() {
     { label: 'AI Status', value: 'Active', icon: Activity, color: 'text-brand-primary' },
     { label: 'Memory Usage', value: '58%', icon: Database, color: 'text-brand-warning' },
     { label: 'CPU Load', value: '31%', icon: Cpu, color: 'text-brand-accent' },
-    { label: 'API Calls', value: stats.apiCalls.toLocaleString(), icon: Zap, color: 'text-brand-success' },
-    { label: 'Gemini Usage', value: stats.apiCalls > 0 ? `${(stats.apiCalls * 14.5).toFixed(0)}K` : '1.2M', icon: Webhook, color: 'text-brand-primary' },
+    { label: 'API Calls', value: (stats.apiCalls || 0).toLocaleString(), icon: Zap, color: 'text-brand-success' },
     { label: 'Supabase', value: 'Connected', icon: Server, color: 'text-brand-success' },
-    { label: 'Plugins', value: '8/8 Active', icon: Box, color: 'text-brand-accent' },
-    { label: 'FB Pages', value: recentPosts.filter(p => p.platform === 'facebook').length.toString() || '12', icon: Globe, color: 'text-brand-primary' },
-    { label: 'WA Accounts', value: '4', icon: MessageSquare, color: 'text-brand-success' },
-  ], [stats.apiCalls, systemHealth, recentPosts]);
+    { label: 'Plugins', value: '8 Active', icon: Box, color: 'text-brand-accent' },
+    { label: 'FB Pages', value: String(recentPosts.filter(p => p.platform === 'facebook').length || 0), icon: Globe, color: 'text-brand-primary' },
+    { label: 'Redis', value: healthMatrix.find(h => h.id === 'redis')?.status === 'online' ? 'Online' : 'Off', icon: Database, color: 'text-brand-accent' },
+    { label: 'Queue', value: String(recentPosts.length || 0), icon: LayoutDashboard, color: 'text-brand-warning' },
+  ], [stats.apiCalls, systemHealth, recentPosts, healthMatrix]);
 
-  const sysMetrics = useMemo(() => {
-    const schoolCount = persistedTenants.filter(t => t.name.toLowerCase().includes('school') || t.name.toLowerCase().includes('education')).length;
-    const churchCount = persistedTenants.filter(t => t.name.toLowerCase().includes('church') || t.name.toLowerCase().includes('diocese')).length;
-    const crmCount = persistedTenants.filter(t => t.plan === 'Business').length;
-    const erpCount = persistedTenants.filter(t => t.plan === 'Enterprise').length;
-
-    return [
-      { label: 'School Systems', value: schoolCount.toString(), icon: Building2, color: 'text-brand-primary' },
-      { label: 'Church Systems', value: churchCount.toString(), icon: BookOpen, color: 'text-brand-accent' },
-      { label: 'CRM Systems', value: crmCount.toString(), icon: Users, color: 'text-brand-warning' },
-      { label: 'ERP Systems', value: erpCount.toString(), icon: Briefcase, color: 'text-brand-primary' },
-      { label: 'Active Tasks', value: persistedTasks.filter(t => t.status !== 'done').length.toString(), icon: ListTodo, color: 'text-brand-success' },
-      { label: 'Bg Workers', value: '42', icon: Workflow, color: 'text-brand-accent' },
-      { label: 'Queue Size', value: recentPosts.length.toString() || '12', icon: LayoutDashboard, color: 'text-brand-warning' },
-      { label: 'System Errors', value: stats.guardianIssues.toString(), icon: AlertCircle, color: 'text-brand-danger' },
-    ];
-  }, [stats.guardianIssues, persistedTasks, persistedTenants, recentPosts]);
+  const sysMetrics = useMemo(() => [
+    { label: 'Messages Today', value: (stats.messagesToday || 0).toLocaleString(), icon: MessageSquare, color: 'text-brand-primary' },
+    { label: 'Posts Published', value: (stats.postsPublished || 0).toLocaleString(), icon: FileText, color: 'text-brand-accent' },
+    { label: 'Active Users', value: (stats.activeUsers || 0).toLocaleString(), icon: Users, color: 'text-brand-warning' },
+    { label: 'Guardian Issues', value: String(stats.guardianIssues || 0), icon: ShieldAlert, color: 'text-brand-danger' },
+    { label: 'Workflows', value: 'Active', icon: Workflow, color: 'text-brand-success' },
+    { label: 'Revenue', value: `$${(stats.revenueMonthly || 0).toLocaleString()}`, icon: DollarSign, color: 'text-brand-success' },
+    { label: 'Bg Workers', value: '42', icon: Server, color: 'text-brand-accent' },
+    { label: 'System Health', value: `${systemHealth}%`, icon: Activity, color: systemHealth > 90 ? 'text-brand-success' : 'text-brand-warning' },
+  ], [stats, systemHealth]);
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="space-y-6 pb-20 md:pb-0"
-    >
-      {/* ── HEADER ── */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between border-b border-brand-border pb-4">
-        <div>
-          <h1 className="text-2xl font-bold uppercase tracking-tight text-brand-text flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-brand-primary" />
-            Command Dashboard
-          </h1>
-          <p className="text-brand-text-muted text-xs font-mono mt-1 uppercase tracking-widest">Real-time platform telemetry and system health monitoring</p>
-        </div>
-        <div className="mt-4 md:mt-0 flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <HealthRadial value={systemHealth} size={44} strokeWidth={4} color={systemHealth > 90 ? '#10B981' : '#F59E0B'} />
-            <span className="text-[10px] font-mono text-brand-text-muted uppercase">System Health</span>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8 pb-24 md:pb-0">
+      
+      {/* ═══ HEADER ═══ */}
+      <div className="relative overflow-hidden bg-brand-surface border border-brand-border rounded-3xl p-6 md:p-8">
+        <SpinningGlobe />
+        <FloatingOrb color="#4F46E5" size={120} x="70%" y="-20%" delay={0} />
+        <FloatingOrb color="#06B6D4" size={80} x="40%" y="50%" delay={2} />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <motion.div
+                animate={{ rotate: [0, 360] }}
+                transition={{ repeat: Infinity, duration: 30, ease: 'linear' }}
+                className="w-12 h-12 rounded-2xl bg-brand-primary/20 flex items-center justify-center"
+              >
+                <Sparkles className="w-6 h-6 text-brand-primary" />
+              </motion.div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                  Kanyoza<span className="text-brand-primary">Command</span>
+                </h1>
+                <p className="text-brand-text-muted text-xs font-mono mt-0.5 uppercase tracking-widest">Platform Telemetry & Control</p>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center space-x-2 bg-brand-surface border border-brand-border px-3 py-1.5">
-            <PulseDot color="#10B981" />
-            <span className="text-[10px] font-mono text-brand-success uppercase tracking-widest">
-              {socketConnected ? 'Live Connection' : 'Disconnected'}
-            </span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <HealthRadial value={systemHealth} size={44} strokeWidth={4} color={systemHealth > 90 ? '#10B981' : '#F59E0B'} />
+              <span className="text-[10px] font-mono text-brand-text-muted uppercase">System<br/>Health</span>
+            </div>
+            <div className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-mono font-bold",
+              socketConnected 
+                ? "bg-brand-success/10 text-brand-success border-brand-success/20" 
+                : "bg-brand-danger/10 text-brand-danger border-brand-danger/20"
+            )}>
+              <PulseDot color={socketConnected ? '#10B981' : '#EF4444'} />
+              {socketConnected ? 'LIVE' : 'OFFLINE'}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── TOP ROW: Stat Cards ── */}
-      <motion.div 
-        className="grid grid-cols-2 md:grid-cols-5 xl:grid-cols-10 gap-3"
-        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-      >
+      {/* ═══ TOP METRICS ═══ */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {topMetrics.map((m, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.03 }}
-            whileHover={{ scale: 1.02, borderColor: '#4F46E5' }}
-            className="bg-brand-surface border border-brand-border p-3 flex flex-col justify-between hover:border-brand-primary/50 transition-all cursor-pointer"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-[9px] uppercase font-bold text-brand-text-muted tracking-widest leading-tight w-2/3">{m.label}</span>
-              <m.icon className={cn("w-4 h-4", m.color)} />
-            </div>
-            <span className={cn("text-sm lg:text-base xl:text-sm font-mono font-bold tracking-tight truncate", m.color)}>{m.value}</span>
-          </motion.div>
+          <MetricCard key={i} {...m} delay={i * 0.04} />
         ))}
-      </motion.div>
+      </div>
 
-      {/* ── SECOND ROW: System Categories ── */}
-      <motion.div 
-        className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3"
-        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-      >
+      {/* ═══ SYSTEM METRICS ═══ */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {sysMetrics.map((m, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + i * 0.03 }}
-            whileHover={{ scale: 1.02 }}
-            className="bg-brand-surface border border-brand-border p-3 flex items-center space-x-3 hover:bg-brand-elevated transition-colors cursor-pointer"
-          >
-            <div className={cn("p-2 rounded bg-brand-elevated border border-brand-border", m.color)}>
-              <m.icon className="w-4 h-4" />
-            </div>
-            <div className="overflow-hidden">
-              <div className="text-[9px] uppercase font-bold text-brand-text-muted tracking-widest truncate">{m.label}</div>
-              <div className="text-lg font-mono font-bold text-brand-text leading-tight">{m.value}</div>
-            </div>
-          </motion.div>
+          <SystemMetricCard key={i} {...m} delay={0.15 + i * 0.04} />
         ))}
-      </motion.div>
+      </div>
 
-      {/* ── THIRD ROW: Activity Stream + Health Matrix ── */}
+      {/* ═══ ACTIVITY + HEALTH ═══ */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <motion.div 
-          className="xl:col-span-2 bg-brand-surface border border-brand-border flex flex-col"
+          className="xl:col-span-2 bg-brand-surface border border-brand-border rounded-3xl flex flex-col overflow-hidden"
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
         >
-          <div className="border-b border-brand-border p-3 bg-brand-elevated">
-            <h2 className="text-xs uppercase font-bold text-brand-text tracking-widest flex items-center">
-              <Network className="w-4 h-4 mr-2 text-brand-primary" />
-              Live Activity Stream
+          <div className="border-b border-brand-border p-4 bg-brand-elevated/50 flex items-center justify-between">
+            <h2 className="text-xs uppercase font-bold text-brand-text tracking-widest flex items-center gap-2">
+              <Network className="w-4 h-4 text-brand-primary" /> Live Activity Stream
             </h2>
+            <span className="text-[9px] font-mono text-brand-text-muted">{messages.length} events</span>
           </div>
-          <div className="p-4 h-80 overflow-y-auto space-y-3 font-mono">
+          <div className="p-4 h-80 overflow-y-auto space-y-2 font-mono">
             {messages.length === 0 ? (
-              <div className="text-xs text-brand-text-muted text-center py-10 uppercase tracking-widest">NO ACTIVITY</div>
-            ) : (
-              messages.map((msg, i) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.02 }}
-                  className="flex space-x-3 items-start text-xs border-b border-brand-border/50 pb-3 last:border-0 hover:bg-brand-elevated/50 p-2 -mx-2 transition-colors"
-                >
-                  <div className="text-brand-text-muted whitespace-nowrap min-w-[80px]">{new Date(msg.time).toLocaleTimeString([], { hour12: false })}</div>
-                  <div className="font-bold text-brand-primary min-w-[120px] uppercase truncate">{msg.user}</div>
-                  <div className="text-brand-text break-words w-full">{msg.message}</div>
-                </motion.div>
-              ))
-            )}
+              <div className="flex items-center justify-center h-full text-brand-text-muted text-xs uppercase tracking-widest">
+                Waiting for activity...
+              </div>
+            ) : messages.map((msg, i) => (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.015 }}
+                className="flex items-start gap-3 text-xs p-2 rounded-xl hover:bg-brand-elevated/50 transition-colors"
+              >
+                <span className="text-brand-text-muted whitespace-nowrap min-w-[70px] text-[10px]">
+                  {new Date(msg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                <span className="font-bold text-brand-primary min-w-[100px] uppercase truncate text-[10px]">{msg.user}</span>
+                <span className="text-brand-text break-words">{msg.message}</span>
+              </motion.div>
+            ))}
           </div>
         </motion.div>
 
         <motion.div 
-          className="bg-brand-surface border border-brand-border flex flex-col"
+          className="bg-brand-surface border border-brand-border rounded-3xl flex flex-col overflow-hidden"
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
         >
-          <div className="border-b border-brand-border p-3 bg-brand-elevated flex justify-between items-center">
-            <h2 className="text-xs uppercase font-bold text-brand-text tracking-widest flex items-center">
-              <Activity className="w-4 h-4 mr-2 text-brand-success" />
-              Service Health Matrix
+          <div className="border-b border-brand-border p-4 bg-brand-elevated/50">
+            <h2 className="text-xs uppercase font-bold text-brand-text tracking-widest flex items-center gap-2">
+              <Activity className="w-4 h-4 text-brand-success" /> Service Health
             </h2>
           </div>
-          <div className="p-4 h-80 overflow-y-auto space-y-2">
+          <div className="p-3 h-80 overflow-y-auto space-y-1.5">
             {healthMatrix.map((svc, i) => (
               <motion.div
                 key={svc.id}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.25 + i * 0.03 }}
-                className="flex items-center justify-between p-2 bg-brand-elevated border border-brand-border hover:border-brand-primary/30 transition-colors"
+                className="flex items-center justify-between p-2.5 rounded-xl hover:bg-brand-elevated/50 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <div className={cn(
-                    'w-1.5 h-1.5 rounded-full',
-                    svc.status === 'online' ? 'bg-brand-success' : svc.status === 'degraded' ? 'bg-brand-warning animate-pulse' : 'bg-brand-danger'
-                  )} />
-                  <div className="text-[11px] font-bold text-brand-text uppercase tracking-wider">{svc.name}</div>
+                <div className="flex items-center gap-2.5">
+                  <PulseDot 
+                    color={svc.status === 'online' ? '#10B981' : svc.status === 'degraded' ? '#F59E0B' : '#EF4444'} 
+                    size="sm" 
+                  />
+                  <span className="text-[11px] font-bold text-brand-text">{svc.name}</span>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center gap-2">
                   <span className="text-[10px] font-mono text-brand-text-muted">{svc.latency}ms</span>
-                  <div className={cn(
-                    "px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest w-[70px] text-center",
-                    svc.status === 'online' ? "text-brand-success bg-brand-success/10 border border-brand-success/20" :
-                    svc.status === 'degraded' ? "text-brand-warning bg-brand-warning/10 border border-brand-warning/20" :
-                    "text-brand-danger bg-brand-danger/10 border border-brand-danger/20"
-                  )}>
-                    {svc.status}
-                  </div>
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-md text-[9px] font-mono uppercase font-bold",
+                    svc.status === 'online' ? "text-brand-success bg-brand-success/10" : 
+                    svc.status === 'degraded' ? "text-brand-warning bg-brand-warning/10" : 
+                    "text-brand-danger bg-brand-danger/10"
+                  )}>{svc.status}</span>
                 </div>
               </motion.div>
             ))}
+            {healthMatrix.length === 0 && (
+              <div className="flex items-center justify-center h-full text-brand-text-muted text-xs uppercase tracking-widest">
+                No health data
+              </div>
+            )}
           </div>
         </motion.div>
       </div>
 
-      {/* ── SYSTEM TOPOLOGY ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}
-      >
+      {/* ═══ SYSTEM TOPOLOGY ═══ */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
         <SystemTopology />
       </motion.div>
 
-      {/* ── FOURTH ROW: Charts ── */}
+      {/* ═══ CHARTS ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <motion.div 
-          className="bg-brand-surface border border-brand-border flex flex-col"
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-        >
-          <div className="border-b border-brand-border p-3 bg-brand-elevated">
-            <h2 className="text-xs uppercase font-bold text-brand-text tracking-widest flex items-center">
-              <Network className="w-4 h-4 mr-2 text-brand-primary" />
-              AI Conversations (30 Days)
-            </h2>
-          </div>
-          <div className="h-64 p-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={conversationData}>
-                <defs>
-                  <linearGradient id="colorConversations" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="day" stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} />
-                <RechartsTooltip content={<ChartTooltip />} cursor={{ stroke: '#1E293B', strokeWidth: 1 }} />
-                <Area type="monotone" dataKey="conversations" stroke="#4F46E5" strokeWidth={2} fillOpacity={1} fill="url(#colorConversations)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
+        {conversationData.length > 0 && (
+          <motion.div 
+            className="bg-brand-surface border border-brand-border rounded-3xl flex flex-col overflow-hidden"
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+          >
+            <div className="border-b border-brand-border p-4 bg-brand-elevated/50">
+              <h2 className="text-xs uppercase font-bold text-brand-text tracking-widest flex items-center gap-2">
+                <Network className="w-4 h-4 text-brand-primary" /> AI Conversations (30d)
+              </h2>
+            </div>
+            <div className="h-64 p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={conversationData}>
+                  <defs>
+                    <linearGradient id="colorConversations" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#4F46E5" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+                  <XAxis dataKey="day" stroke="#475569" fontSize={9} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#475569" fontSize={9} tickLine={false} axisLine={false} />
+                  <RechartsTooltip content={<ChartTooltip />} />
+                  <Area type="monotone" dataKey="conversations" stroke="#4F46E5" strokeWidth={2} fill="url(#colorConversations)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+        )}
+
+        {postsData.length > 0 && (
+          <motion.div 
+            className="bg-brand-surface border border-brand-border rounded-3xl flex flex-col overflow-hidden"
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+          >
+            <div className="border-b border-brand-border p-4 bg-brand-elevated/50">
+              <h2 className="text-xs uppercase font-bold text-brand-text tracking-widest flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-brand-accent" /> Publishing (7d)
+              </h2>
+            </div>
+            <div className="h-64 p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={postsData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+                  <XAxis dataKey="name" stroke="#475569" fontSize={9} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#475569" fontSize={9} tickLine={false} axisLine={false} />
+                  <RechartsTooltip content={<ChartTooltip />} />
+                  <Bar dataKey="daily" fill="#06B6D4" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+        )}
 
         <motion.div 
-          className="bg-brand-surface border border-brand-border flex flex-col"
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-        >
-          <div className="border-b border-brand-border p-3 bg-brand-elevated">
-            <h2 className="text-xs uppercase font-bold text-brand-text tracking-widest flex items-center">
-              <BarChart3 className="w-4 h-4 mr-2 text-brand-accent" />
-              Content Publishing Metrics
-            </h2>
-          </div>
-          <div className="h-64 p-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={postsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="name" stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748B" fontSize={10} tickLine={false} axisLine={false} />
-                <RechartsTooltip content={<ChartTooltip />} cursor={{ fill: '#1C2541' }} />
-                <Bar dataKey="monthly" fill="#1E293B" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="daily" fill="#06B6D4" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Platform Distribution Pie */}
-        <motion.div 
-          className="bg-brand-surface border border-brand-border flex flex-col"
+          className="bg-brand-surface border border-brand-border rounded-3xl flex flex-col overflow-hidden"
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}
         >
-          <div className="border-b border-brand-border p-3 bg-brand-elevated">
-            <h2 className="text-xs uppercase font-bold text-brand-text tracking-widest flex items-center">
-              <Globe className="w-4 h-4 mr-2 text-brand-accent" />
-              Platform Distribution
+          <div className="border-b border-brand-border p-4 bg-brand-elevated/50">
+            <h2 className="text-xs uppercase font-bold text-brand-text tracking-widest flex items-center gap-2">
+              <Globe className="w-4 h-4 text-brand-accent" /> Platforms
             </h2>
           </div>
           <div className="h-64 p-4 flex items-center justify-center">
             {platformData.length === 0 ? (
-              <p className="text-xs text-brand-text-muted uppercase tracking-widest">No data</p>
+              <p className="text-xs text-brand-text-muted uppercase tracking-widest">No data yet</p>
             ) : (
               <div className="flex items-center gap-4 w-full">
-                <div className="w-32 h-32 flex-shrink-0">
+                <div className="w-28 h-28 flex-shrink-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={platformData} cx="50%" cy="50%" innerRadius={28} outerRadius={55} paddingAngle={3} dataKey="value">
-                        {platformData.map((_, i) => (
-                          <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="transparent" />
-                        ))}
+                      <Pie data={platformData} cx="50%" cy="50%" innerRadius={25} outerRadius={48} paddingAngle={4} dataKey="value">
+                        {platformData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="transparent" />)}
                       </Pie>
                     </PieChart>
                   </ResponsiveContainer>
@@ -438,129 +453,38 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
-      {/* ── FIFTH ROW: Bottom Metrics ── */}
-      <motion.div 
-        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6"
-        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+      {/* ═══ QUICK ACTIONS ═══ */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+        className="grid grid-cols-3 md:grid-cols-6 gap-3"
       >
-        {/* Revenue Card */}
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          className="bg-brand-surface border border-brand-border p-4 flex flex-col justify-center relative overflow-hidden"
-        >
-          <div className="absolute top-0 right-0 w-20 h-20 bg-brand-success/5 rounded-full blur-2xl" />
-          <div className="relative z-10">
-            <div className="text-[10px] uppercase font-bold text-brand-text-muted tracking-widest mb-4 flex items-center">
-              <DollarSign className="w-3 h-3 mr-1 text-brand-success" />
-              Monthly Revenue
-            </div>
-            <div className="text-4xl font-mono font-bold text-brand-text tracking-tight">
-              <AnimatedNumber value={stats.revenueMonthly} />
-            </div>
-            <div className="text-[10px] font-mono text-brand-success flex items-center mt-3 tracking-widest">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              +14.5% VS LAST MONTH
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Recent Publications */}
-        <div className="xl:col-span-2 bg-brand-surface border border-brand-border p-4 flex flex-col h-40">
-          <div className="text-[10px] uppercase font-bold text-brand-text-muted tracking-widest mb-3 flex items-center">
-            <FileText className="w-3 h-3 mr-1 text-brand-primary" />
-            Recent Publications
-          </div>
-          <div className="space-y-2 flex-1 overflow-y-auto pr-2">
-            {recentPosts.slice(0, 3).map((post, i) => (
-              <motion.div
-                key={post.id}
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 + i * 0.05 }}
-                whileHover={{ borderColor: '#4F46E5' }}
-                className="flex justify-between items-center bg-brand-elevated border border-brand-border p-2 hover:border-brand-primary/30 transition-colors cursor-pointer"
-              >
-                <div className="text-xs font-bold text-brand-text truncate pr-4">{post.title}</div>
-                <div className="text-[9px] font-mono text-brand-text-muted uppercase px-2 py-0.5 bg-brand-surface border border-brand-border">{post.platform}</div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* Active Alerts */}
-        <div className="bg-brand-surface border border-brand-border p-4 flex flex-col h-40">
-          <div className="text-[10px] uppercase font-bold text-brand-text-muted tracking-widest mb-3 flex items-center">
-            <ShieldAlert className="w-3 h-3 mr-1 text-brand-danger" />
-            Active Alerts
-          </div>
-          <div className="space-y-2 flex-1 overflow-y-auto">
-            {guardianAlerts.slice(0, 3).map((alert, i) => (
-              <motion.div
-                key={alert.id}
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 + i * 0.05 }}
-                className="text-[10px] font-mono border-l-2 border-brand-danger pl-2 py-1 flex flex-col hover:bg-brand-danger/5 transition-colors cursor-pointer"
-              >
-                <span className="text-brand-danger font-bold uppercase tracking-widest">{alert.severity}</span>
-                <span className="text-brand-text-muted truncate mt-0.5">{alert.title}</span>
-              </motion.div>
-            ))}
-            {guardianAlerts.length === 0 && <div className="text-[10px] font-mono text-brand-success py-2 tracking-widest">NO ACTIVE ALERTS</div>}
-          </div>
-        </div>
-
-        {/* Connected Tenants + Warnings */}
-        <div className="bg-brand-surface border border-brand-border flex flex-col h-40">
-          <motion.div
-            whileHover={{ backgroundColor: 'rgba(79,70,229,0.05)' }}
-            className="flex-1 p-3 border-b border-brand-border flex flex-col justify-center items-center transition-colors cursor-pointer"
-            onClick={() => navigate('/tenants')}
+        {[
+          { label: 'New Post', icon: FileText, color: 'bg-brand-primary hover:bg-brand-primary/90', path: '/posts' },
+          { label: 'AI Brain', icon: BrainCircuit, color: 'bg-brand-accent hover:bg-brand-accent/90', path: '/ai-brain' },
+          { label: 'Security', icon: ShieldAlert, color: 'bg-brand-danger hover:bg-brand-danger/90', path: '/security' },
+          { label: 'Analytics', icon: BarChart3, color: 'bg-brand-success hover:bg-brand-success/90', path: '/analytics' },
+          { label: 'Monitoring', icon: Activity, color: 'bg-brand-warning hover:bg-brand-warning/90', path: '/monitoring' },
+          { label: 'Settings', icon: ChevronRight, color: 'bg-brand-elevated border border-brand-border hover:bg-brand-elevated/80 text-brand-text', path: '/settings' },
+        ].map((action, i) => (
+          <motion.button
+            key={action.label}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 + i * 0.05 }}
+            onClick={() => navigate(action.path)}
+            className={cn(
+              'flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all relative overflow-hidden group',
+              action.color
+            )}
           >
-            <div className="text-[9px] uppercase font-bold text-brand-text-muted tracking-widest mb-1">Connected Tenants</div>
-            <div className="text-2xl font-mono font-bold text-brand-text">{persistedTenants.length}</div>
-          </motion.div>
-          <motion.div
-            whileHover={{ backgroundColor: 'rgba(239,68,68,0.08)' }}
-            className="flex-1 p-3 flex flex-col justify-center items-center bg-brand-danger/5 transition-colors cursor-pointer"
-            onClick={() => navigate('/security')}
-          >
-            <div className="text-[9px] uppercase font-bold text-brand-danger tracking-widest mb-1">Active Warnings</div>
-            <div className="text-2xl font-mono font-bold text-brand-danger">{stats.guardianIssues}</div>
-          </motion.div>
-        </div>
+            <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+            <action.icon className="w-4 h-4 relative z-10" />
+            <span className="relative z-10">{action.label}</span>
+          </motion.button>
+        ))}
       </motion.div>
- 
-       {/* ── QUICK ACTIONS ── */}
-       <motion.div
-         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-         className="grid grid-cols-3 md:grid-cols-6 gap-3"
-       >
-         {[
-           { label: 'New Post', icon: FileText, color: 'bg-brand-primary hover:bg-brand-primary/90', path: '/posts' },
-           { label: 'AI Chat', icon: BrainCircuit, color: 'bg-brand-accent hover:bg-brand-accent/90', path: '/ai-chat' },
-           { label: 'Security', icon: ShieldAlert, color: 'bg-brand-danger hover:bg-brand-danger/90', path: '/security' },
-           { label: 'Analytics', icon: BarChart3, color: 'bg-brand-success hover:bg-brand-success/90', path: '/analytics' },
-           { label: 'Monitoring', icon: Activity, color: 'bg-brand-warning hover:bg-brand-warning/90', path: '/monitoring' },
-           { label: 'Settings', icon: ChevronRight, color: 'bg-brand-elevated border border-brand-border hover:bg-brand-elevated/80', path: '/settings' },
-         ].map((action, i) => (
-           <motion.button
-             key={action.label}
-             whileHover={{ scale: 1.03 }}
-             whileTap={{ scale: 0.97 }}
-             initial={{ opacity: 0, y: 8 }}
-             animate={{ opacity: 1, y: 0 }}
-             transition={{ delay: 0.5 + i * 0.04 }}
-             className={cn(
-               'flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all text-white',
-               action.color
-             )}
-            onClick={() => navigate(action.path)}>
-             <action.icon className="w-4 h-4" />
-             {action.label}
-           </motion.button>
-         ))}
-       </motion.div>
-     </motion.div>
-   );
+    </motion.div>
+  );
 }
