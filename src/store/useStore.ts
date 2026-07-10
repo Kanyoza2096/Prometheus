@@ -220,19 +220,22 @@ export const useStore = create<AppState>((set, get) => ({
   restEndpoint: localStorage.getItem('rest_endpoint') || import.meta.env.VITE_REST_ENDPOINT || 'https://kanyoza-systems-bot.onrender.com/api/v1',
   masterToken: localStorage.getItem('master_token') || import.meta.env.VITE_MASTER_TOKEN || '',
   setConnectionParams: (params) => {
-    const previousWsEndpoint = get().wsEndpoint;
+  const previousWsEndpoint = get().wsEndpoint;
 
-    if (params.wsEndpoint !== undefined) localStorage.setItem('ws_endpoint', params.wsEndpoint);
-    if (params.restEndpoint !== undefined) localStorage.setItem('rest_endpoint', params.restEndpoint);
-    if (params.masterToken !== undefined) localStorage.setItem('master_token', params.masterToken);
+  if (params.wsEndpoint !== undefined) localStorage.setItem('ws_endpoint', params.wsEndpoint);
+  if (params.restEndpoint !== undefined) localStorage.setItem('rest_endpoint', params.restEndpoint);
+  if (params.masterToken !== undefined) localStorage.setItem('master_token', params.masterToken);
 
-    set((state) => ({ ...state, ...params }));
+  set((state) => ({ ...state, ...params }));
+  
+  // Re-fetch all data with new credentials
+  get().fetchInitialData();
 
-    if (params.wsEndpoint && params.wsEndpoint !== previousWsEndpoint) {
-      get().disconnectSocket();
-      get().connectSocket();
-    }
-  },
+  if (params.wsEndpoint && params.wsEndpoint !== previousWsEndpoint) {
+    get().disconnectSocket();
+    get().connectSocket();
+  }
+},
 
   supabaseUrl: localStorage.getItem('supabase_url') || import.meta.env.VITE_SUPABASE_URL || '',
   supabaseAnonKey: localStorage.getItem('supabase_anon_key') || import.meta.env.VITE_SUPABASE_ANON_KEY || '',
