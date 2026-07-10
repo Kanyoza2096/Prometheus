@@ -79,14 +79,13 @@ export default function Analytics() {
   const perfMessages = perfQ.data?.messages ?? [];
   const topPosts     = postsQ.data?.posts   ?? [];
   const tokenByDay   = tokenQ.data?.by_day  ?? [];
-  // MetricPoint = { t: number (unix ms), v: number } — show latest value per series
+  // Backend /metrics returns a single point-in-time snapshot object
+  // (utils.metrics.get_snapshot()), not time-series arrays — render whatever
+  // numeric counters are present instead of assuming a fixed cpu/memory/rps shape.
   const metricsData: Array<{ name: string; value: number; unit: string }> = metricsQ.data
-    ? [
-        { name: 'CPU',        value: metricsQ.data.cpu?.slice(-1)[0]?.v        ?? 0, unit: '%'   },
-        { name: 'Memory',     value: metricsQ.data.memory?.slice(-1)[0]?.v     ?? 0, unit: '%'   },
-        { name: 'RPS',        value: metricsQ.data.rps?.slice(-1)[0]?.v        ?? 0, unit: 'r/s' },
-        { name: 'Error Rate', value: metricsQ.data.error_rate?.slice(-1)[0]?.v ?? 0, unit: '%'   },
-      ]
+    ? Object.entries(metricsQ.data.metrics ?? {})
+        .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
+        .map(([name, value]) => ({ name, value, unit: '' }))
     : [];
 
   // Build heatmap grid: normalise whatever shape the API returns

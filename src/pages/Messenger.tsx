@@ -25,6 +25,8 @@ export default function Messenger() {
     queryKey: ['conversations', restEndpoint],
     queryFn: () => fetchConversations(cfg),
     refetchInterval: 20_000,
+    retry: 1,
+    staleTime: 10_000,
   });
 
   const conversations: ConversationSummary[] = convData?.conversations ?? [];
@@ -39,6 +41,8 @@ export default function Messenger() {
     queryFn: () => fetchConversation(cfg, activeId as string),
     enabled: !!activeId,
     refetchInterval: 10_000,
+    retry: 1,
+    staleTime: 5_000,
   });
 
   const messages: MessageEntry[] = msgData?.messages ?? [];

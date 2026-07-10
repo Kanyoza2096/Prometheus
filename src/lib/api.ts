@@ -144,16 +144,19 @@ export const triggerScan = (cfg: ApiConfig) =>
   request<ScanResult>(cfg, '/guardian/scan', { method: 'POST' });
 
 // ── Metrics (Prometheus) ──────────────────────────────────────────────────────
+//
+// NOTE: the backend does NOT return time-series arrays here — GET /metrics
+// wraps a single point-in-time snapshot object from utils.metrics.get_snapshot().
+// Shape observed in the backend: { metrics: { counters: {...}, uptime_seconds, ... }, as_of }
 
-export interface MetricPoint {
-  t: number; // unix timestamp ms
-  v: number;
+export interface MetricsSnapshot {
+  counters?: Record<string, number>;
+  uptime_seconds?: number;
+  [k: string]: unknown;
 }
 export interface MetricsPayload {
-  cpu: MetricPoint[];
-  memory: MetricPoint[];
-  rps: MetricPoint[];
-  error_rate: MetricPoint[];
+  metrics: MetricsSnapshot;
+  as_of: string;
 }
 export const fetchMetrics = (cfg: ApiConfig) =>
   request<MetricsPayload>(cfg, '/metrics');
@@ -175,9 +178,13 @@ export const fetchResources = (cfg: ApiConfig) =>
 // ── API Key management ────────────────────────────────────────────────────────
 
 export interface GeneratedKey {
-  key: string;
+  key_id: string;
+  /** The full raw token — only ever returned once, at creation time. */
+  token: string;
+  prefix: string;
   created_at: string;
   label: string;
+  note?: string;
 }
 export const generateApiKey = (cfg: ApiConfig) =>
   request<GeneratedKey>(cfg, '/keys/generate', { method: 'POST' });
@@ -211,15 +218,23 @@ export const triggerPostNow = (cfg: ApiConfig) =>
 
 // ── AI Config ─────────────────────────────────────────────────────────────────
 
+// NOTE: backend has NO flat `temperature` field — it's split into
+// chat_temperature / post_temperature (config/settings.py), and PUT strictly
+// 400s on any unknown key, so only these exact keys may be sent.
 export interface AIConfigPayload {
+  provider?: string;
   model?: string;
-  temperature?: number;
+  chat_temperature?: number;
+  post_temperature?: number;
   safety_level?: string;
+  available_models?: string[];
+  available_providers?: string[];
+  system_prompt_override?: string;
+  persona_mood?: string;
   tone_assertiveness?: number;
   tone_humor?: number;
   tone_formality?: number;
-  persona_mood?: string;
-  system_prompt_override?: string;
+  available_moods?: string[];
   [k: string]: unknown;
 }
 
@@ -228,16 +243,18 @@ export const fetchAIConfig = (cfg: ApiConfig) =>
 
 /** Update AI model, temperature, or personality at runtime. */
 export const updateAIConfig = (cfg: ApiConfig, payload: {
+  provider?: string;
   model?: string;
-  temperature?: number;
+  chat_temperature?: number;
+  post_temperature?: number;
   safety_level?: string;
+  system_prompt_override?: string;
+  persona_mood?: string;
   tone_assertiveness?: number;
   tone_humor?: number;
   tone_formality?: number;
-  persona_mood?: string;
-  system_prompt_override?: string;
 }) =>
-  request<{ ok: boolean; updated?: boolean; config?: Record<string, unknown> }>(
+  request<{ ok: boolean } & AIConfigPayload>(
     cfg, '/ai/config', { method: 'PUT', body: JSON.stringify(payload) }
   );
 
@@ -542,14 +559,16 @@ export interface AIProfile {
   [k: string]: unknown;
 }
 
+// NOTE: backend key is `ai_profiles` (plural, snake_case) on GET, and a
+// singular `ai_profile` object on POST/PUT — not `profiles`/`profile`.
 export const fetchAIProfiles = (cfg: ApiConfig, workspaceId: string | number) =>
-  request<{ profiles: AIProfile[] }>(cfg, `/workspaces/${workspaceId}/ai-profiles`);
+  request<{ ai_profiles: AIProfile[] }>(cfg, `/workspaces/${workspaceId}/ai-profiles`);
 
 export const createAIProfile = (cfg: ApiConfig, workspaceId: string | number, payload: Partial<AIProfile>) =>
-  request<{ ok: boolean; profile?: AIProfile }>(cfg, `/workspaces/${workspaceId}/ai-profiles`, { method: 'POST', body: JSON.stringify(payload) });
+  request<{ ok: boolean; ai_profile?: AIProfile }>(cfg, `/workspaces/${workspaceId}/ai-profiles`, { method: 'POST', body: JSON.stringify(payload) });
 
 export const updateAIProfile = (cfg: ApiConfig, id: string | number, payload: Partial<AIProfile>) =>
-  request<{ ok: boolean; profile?: AIProfile }>(cfg, `/ai-profiles/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  request<{ ok: boolean; ai_profile?: AIProfile }>(cfg, `/ai-profiles/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 
 export const deleteAIProfile = (cfg: ApiConfig, id: string | number) =>
   request<{ ok: boolean }>(cfg, `/ai-profiles/${id}`, { method: 'DELETE' });
@@ -566,11 +585,19 @@ export interface KnowledgeDoc {
   [k: string]: unknown;
 }
 
+// NOTE: backend key is `knowledge_entries` on GET and `knowledge_entry` on
+// POST — not `documents`/`document`. Also the create payload's extra fields
+// (title, tags) must be nested under `metadata`, not sent flat.
 export const fetchKnowledgeDocs = (cfg: ApiConfig, brandId: string | number) =>
-  request<{ documents: KnowledgeDoc[] }>(cfg, `/brands/${brandId}/knowledge`);
+  request<{ knowledge_entries: KnowledgeDoc[] }>(cfg, `/brands/${brandId}/knowledge`);
 
-export const createKnowledgeDoc = (cfg: ApiConfig, brandId: string | number, payload: { content: string; doc_type: string; tags?: string; title?: string }) =>
-  request<{ ok: boolean; document?: KnowledgeDoc }>(cfg, `/brands/${brandId}/knowledge`, { method: 'POST', body: JSON.stringify(payload) });
+export const createKnowledgeDoc = (cfg: ApiConfig, brandId: string | number, payload: { content: string; doc_type: string; tags?: string; title?: string }) => {
+  const { content, doc_type, ...metadata } = payload;
+  return request<{ ok: boolean; knowledge_entry?: KnowledgeDoc }>(cfg, `/brands/${brandId}/knowledge`, {
+    method: 'POST',
+    body: JSON.stringify({ content, doc_type, metadata }),
+  });
+};
 
 export const searchKnowledge = (cfg: ApiConfig, brandId: string | number, query: string, topK = 5) =>
   request<{ results: KnowledgeDoc[] }>(cfg, `/brands/${brandId}/knowledge/search`, { method: 'POST', body: JSON.stringify({ query, top_k: topK }) });
@@ -613,18 +640,20 @@ export const fetchAuditLogs = (cfg: ApiConfig, limit = 50) =>
 
 // ── API Keys ──────────────────────────────────────────────────────────────────
 
+// NOTE: backend never returns a `status` string — only a `revoked` boolean.
+// The GET /keys list only ever contains non-revoked keys (already filtered server-side).
 export interface ApiKeyEntry {
-  id: string | number;
+  id: string;
   label: string;
   prefix?: string;
   created_at?: string;
-  last_used?: string;
-  status?: string;
+  last_used?: string | null;
+  revoked?: boolean;
   [k: string]: unknown;
 }
 
 export const fetchApiKeys = (cfg: ApiConfig) =>
-  request<{ keys: ApiKeyEntry[] }>(cfg, '/keys');
+  request<{ keys: ApiKeyEntry[]; count: number }>(cfg, '/keys');
 
 export const generateApiKeyLabeled = (cfg: ApiConfig, label: string) =>
   request<GeneratedKey>(cfg, '/keys/generate', { method: 'POST', body: JSON.stringify({ label }) });
@@ -666,8 +695,28 @@ export interface MessageEntry {
   [k: string]: unknown;
 }
 
-export const fetchConversations = (cfg: ApiConfig, limit = 50) =>
-  request<{ conversations: ConversationSummary[] }>(cfg, `/messages?limit=${limit}`);
+// NOTE: GET /messages returns a flat `{ messages, count }` list of raw
+// message events (per analytics.get_recent_messages) — there is no
+// server-side grouping into conversations, so we derive it client-side by
+// taking the most recent message per sender_id.
+export const fetchConversations = async (cfg: ApiConfig, limit = 50) => {
+  const { messages } = await request<{ messages: MessageEntry[]; count: number }>(cfg, `/messages?limit=${limit}`);
+  const bySender = new Map<string, ConversationSummary>();
+  for (const m of messages) {
+    if (!m.sender_id) continue;
+    const existing = bySender.get(m.sender_id);
+    if (!existing) {
+      bySender.set(m.sender_id, {
+        sender_id: m.sender_id,
+        name: (m as any).name,
+        last_message: m.text,
+        time: m.time,
+        unread: 0,
+      });
+    }
+  }
+  return { conversations: Array.from(bySender.values()) };
+};
 
 export const fetchConversation = (cfg: ApiConfig, senderId: string) =>
   request<{ messages: MessageEntry[] }>(cfg, `/messages/${senderId}`);
@@ -717,12 +766,23 @@ export const fetchAnalyticsPerformance  = (cfg: ApiConfig) => request<AnalyticsP
 export const fetchAnalyticsPostsPerf    = (cfg: ApiConfig) => request<PostsPerformance>(cfg, '/analytics/posts-performance');
 export const fetchAnalyticsTokenUsage   = (cfg: ApiConfig) => request<TokenUsage>(cfg, '/analytics/token-usage');
 export const fetchAnalyticsHeatmap      = (cfg: ApiConfig) => request<EngagementHeatmap>(cfg, '/analytics/engagement-heatmap');
-export const fetchMetricsPublic         = (cfg: ApiConfig) => request<MetricsPayload>(cfg, '/metrics/public');
+// NOTE: /metrics/public does NOT share MetricsPayload's shape — it's a flat
+// lightweight snapshot, not time-series arrays.
+export interface PublicMetricsPayload {
+  uptime_seconds: number;
+  total_posts: number;
+  total_messages: number;
+  total_errors: number;
+  as_of: string;
+}
+export const fetchMetricsPublic = (cfg: ApiConfig) => request<PublicMetricsPayload>(cfg, '/metrics/public');
 
 // ── Rate Limits ───────────────────────────────────────────────────────────────
 
+// NOTE: backend key is `rate_limits` (a raw list of Supabase `rate_limit_config`
+// rows) — not `limits`. Row shape is whatever that table defines, so keep it loose.
 export interface RateLimitEntry {
-  id: string | number;
+  id?: string | number;
   identifier?: string;
   endpoint?: string;
   limit?: number;
@@ -732,7 +792,7 @@ export interface RateLimitEntry {
   [k: string]: unknown;
 }
 
-export const fetchRateLimits  = (cfg: ApiConfig) => request<{ limits: RateLimitEntry[] }>(cfg, '/rate-limits');
+export const fetchRateLimits  = (cfg: ApiConfig) => request<{ rate_limits: RateLimitEntry[] }>(cfg, '/rate-limits');
 export const unblockRateLimit = (cfg: ApiConfig, identifier: string) =>
   request<{ ok: boolean }>(cfg, '/rate-limits/unblock', { method: 'POST', body: JSON.stringify({ identifier }) });
 
@@ -777,22 +837,25 @@ export interface SystemHealthEntry {
   [k: string]: unknown;
 }
 
+// NOTE: backend returns `connectors` (a dict of connector-name -> health
+// status from HealthChecker.check_all()), not a `services` array.
 export const fetchSystemHealth = (cfg: ApiConfig) =>
-  request<{ status?: string; services?: SystemHealthEntry[]; uptime?: number; [k: string]: unknown }>(cfg, '/system/health');
+  request<{ status?: string; connectors?: Record<string, SystemHealthEntry>; as_of?: string; [k: string]: unknown }>(cfg, '/system/health');
 
 // ── Scan ──────────────────────────────────────────────────────────────────────
 
-export interface ScanHistoryEntry {
-  id: string | number;
-  started_at?: string;
-  completed_at?: string;
-  findings?: number;
-  status?: string;
+// NOTE: GET /scan does NOT return `scans`/`last_scan` — it returns the
+// GuardianService's current status fields spread flat, plus an `issues` array.
+// There is no historical scan log endpoint.
+export interface ScanStatusPayload {
+  configured?: boolean;
+  issues: GuardianIssue[];
+  last_scan_at?: string;
   [k: string]: unknown;
 }
 
 export const fetchScanHistory = (cfg: ApiConfig) =>
-  request<{ scans?: ScanHistoryEntry[]; last_scan?: ScanHistoryEntry }>(cfg, '/scan');
+  request<ScanStatusPayload>(cfg, '/scan');
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 

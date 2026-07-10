@@ -25,15 +25,15 @@ export default function APIManager() {
     queryKey: ['api-keys', restEndpoint],
     queryFn: () => fetchApiKeys(cfg),
     retry: 1,
+    staleTime: 30_000,
   });
 
   const keys: ApiKeyEntry[] = data?.keys ?? [];
 
   const genMut = useMutation({
     mutationFn: (l: string) => generateApiKeyLabeled(cfg, l),
-    onSuccess: (res: any) => {
-      const newKey = res?.api_key || res?.key || res?.token;
-      if (newKey) setFreshKey(newKey);
+    onSuccess: (res: { token?: string }) => {
+      if (res?.token) setFreshKey(res.token);
       setLabel('');
       setShowNewForm(false);
       qc.invalidateQueries({ queryKey: ['api-keys', restEndpoint] });
@@ -178,11 +178,11 @@ export default function APIManager() {
                 </div>
                 <span className={cn(
                   'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
-                  apiKey.status !== 'revoked'
+                  !apiKey.revoked
                     ? 'bg-brand-success/20 text-brand-success'
                     : 'bg-brand-text-muted/20 text-brand-text-muted'
                 )}>
-                  {apiKey.status || 'active'}
+                  {apiKey.revoked ? 'revoked' : 'active'}
                 </span>
               </div>
               <div className="flex items-center gap-2">

@@ -12,7 +12,7 @@ import { Spinner } from '../components/Spinner';
 import {
   fetchGuardianStatus, fetchGuardianIssues, fetchAuditLogs, triggerScan,
   fetchSystemHealth, fetchScanHistory, fetchSystemConnectors,
-  type GuardianIssue, type AuditLogEntry, type SystemHealthEntry, type ScanHistoryEntry,
+  type GuardianIssue, type AuditLogEntry, type SystemHealthEntry,
 } from '../lib/api';
 
 function Toast({ msg, kind, onDismiss }: { msg: string; kind: 'success' | 'error'; onDismiss: () => void }) {
@@ -79,8 +79,12 @@ export default function Security() {
   const status  = statusQuery.data;
   const issues: GuardianIssue[]       = issuesQuery.data?.issues ?? [];
   const logs: AuditLogEntry[]         = auditQuery.data?.logs ?? [];
-  const services: SystemHealthEntry[] = healthQuery.data?.services ?? [];
-  const scanHistory: ScanHistoryEntry[] = scanHistQuery.data?.scans ?? [];
+  // Backend returns a `connectors` dict (name -> health status), not a `services` array.
+  const services: Array<{ service: string } & SystemHealthEntry> = Object.entries(healthQuery.data?.connectors ?? {})
+    .map(([service, s]) => ({ service, ...(s as SystemHealthEntry) }));
+  // Backend has no historical scan log — GET /scan returns the current Guardian
+  // status + issue list, not a list of past runs.
+  const currentScan = scanHistQuery.data;
   // ConnectorInfo.supported_connectors is string[] — map to display objects
   const connectors: Array<{ name: string; status: string }> = (connectorsQ.data?.supported_connectors ?? []).map(name => ({ name, status: 'connected' }));
 
@@ -165,8 +169,8 @@ export default function Security() {
         </div>
         <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col justify-center">
           <div className="w-10 h-10 bg-brand-primary/20 rounded-xl flex items-center justify-center mb-4"><Activity className="w-5 h-5 text-brand-primary" /></div>
-          <div className="text-3xl font-bold text-brand-text">{scanMut.isPending ? <Spinner size={24} /> : (scanHistory.length > 0 ? scanHistory.length : '—')}</div>
-          <div className="text-brand-text-muted text-xs font-mono uppercase mt-1">Scans Run</div>
+          <div className="text-3xl font-bold text-brand-text">{scanMut.isPending ? <Spinner size={24} /> : (currentScan?.issues?.length ?? '—')}</div>
+          <div className="text-brand-text-muted text-xs font-mono uppercase mt-1">Current Scan Issues</div>
         </div>
       </div>
 
@@ -196,8 +200,8 @@ export default function Security() {
               ))}
             </div>
           )}
-          {healthQuery.data?.uptime !== undefined && (
-            <p className="text-[10px] font-mono text-brand-text-muted mt-3">Uptime: {healthQuery.data.uptime}s</p>
+          {healthQuery.data?.as_of && (
+            <p className="text-[10px] font-mono text-brand-text-muted mt-3">As of: {new Date(healthQuery.data.as_of).toLocaleString()}</p>
           )}
         </div>
       )}
@@ -264,29 +268,25 @@ export default function Security() {
         </div>
       </div>
 
-      {/* Scan History */}
-      {scanHistory.length > 0 && (
+      {/* Current Scan Status — the backend has no historical scan log, only a live snapshot */}
+      {currentScan && (
         <div className="bg-brand-surface border border-brand-border rounded-2xl p-6">
           <h2 className="text-sm font-bold uppercase tracking-widest text-brand-text-muted mb-4 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-brand-text-muted" /> Scan History
+            <Clock className="w-4 h-4 text-brand-text-muted" /> Current Scan Status
           </h2>
-          <div className="space-y-2">
-            {scanHistory.slice(0, 8).map((scan, i) => (
-              <div key={scan.id ?? i} className="flex items-center gap-4 p-3 bg-brand-elevated rounded-xl border border-brand-border">
-                <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border font-mono uppercase',
-                  scan.status === 'complete' || scan.status === 'success' ? 'bg-brand-success/10 border-brand-success/30 text-brand-success' : 'bg-brand-warning/10 border-brand-warning/30 text-brand-warning')}>
-                  {scan.status ?? 'unknown'}
-                </span>
-                <span className="text-xs font-mono text-brand-text-muted flex-1">
-                  {scan.started_at ? new Date(scan.started_at).toLocaleString() : '—'}
-                </span>
-                {scan.findings !== undefined && (
-                  <span className={cn('text-xs font-bold font-mono', scan.findings > 0 ? 'text-brand-danger' : 'text-brand-success')}>
-                    {scan.findings} finding{scan.findings !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-            ))}
+          <div className="flex items-center gap-4 p-3 bg-brand-elevated rounded-xl border border-brand-border">
+            <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border font-mono uppercase',
+              currentScan.configured ? 'bg-brand-success/10 border-brand-success/30 text-brand-success' : 'bg-brand-warning/10 border-brand-warning/30 text-brand-warning')}>
+              {currentScan.configured ? 'configured' : 'not configured'}
+            </span>
+            {currentScan.last_scan_at && (
+              <span className="text-xs font-mono text-brand-text-muted flex-1">
+                Last run: {new Date(currentScan.last_scan_at).toLocaleString()}
+              </span>
+            )}
+            <span className={cn('text-xs font-bold font-mono', currentScan.issues.length > 0 ? 'text-brand-danger' : 'text-brand-success')}>
+              {currentScan.issues.length} issue{currentScan.issues.length !== 1 ? 's' : ''}
+            </span>
           </div>
         </div>
       )}

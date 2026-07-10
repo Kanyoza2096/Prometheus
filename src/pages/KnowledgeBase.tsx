@@ -45,7 +45,7 @@ export default function KnowledgeBase() {
     retry: 1,
     staleTime: 60_000,
   });
-  const documents: KnowledgeDoc[] = data?.documents ?? [];
+  const documents: KnowledgeDoc[] = data?.knowledge_entries ?? [];
 
   // ── Global knowledge ───────────────────────────────────────────────────────
   const { data: globalData, isLoading: globalLoading, isError: globalError, refetch: globalRefetch } = useQuery({

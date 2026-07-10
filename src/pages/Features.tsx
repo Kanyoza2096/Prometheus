@@ -53,7 +53,7 @@ export default function Features() {
     retry: 1,
     staleTime: 30_000,
   });
-  const limits: RateLimitEntry[] = rlData?.limits ?? [];
+  const limits: RateLimitEntry[] = rlData?.rate_limits ?? [];
   const blockedLimits = limits.filter(l => l.blocked);
 
   const unblockMut = useMutation({

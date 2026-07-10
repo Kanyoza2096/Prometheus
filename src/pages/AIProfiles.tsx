@@ -17,8 +17,9 @@ export default function AIProfiles() {
     queryFn: () => fetchAIProfiles(cfg, workspaceId as string | number),
     enabled: !!workspaceId,
     retry: 1,
+    staleTime: 60_000,
   });
-  const profiles: AIProfile[] = data?.profiles ?? [];
+  const profiles: AIProfile[] = data?.ai_profiles ?? [];
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<AIProfile | null>(null);

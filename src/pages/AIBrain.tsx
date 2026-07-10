@@ -104,7 +104,10 @@ export default function AIBrain() {
 
   // ── local editable state ────────────────────────────────────────────────────
   const [model, setModel] = useState('gemini-1.5-pro');
+  // Backend splits temperature into chat/post; the slider edits chat_temperature
+  // and post_temperature is preserved separately so Save doesn't clobber it.
   const [temperature, setTemperature] = useState(0.7);
+  const [postTemperature, setPostTemperature] = useState(0.7);
   const [safetyLevel, setSafetyLevel] = useState<string>('medium');
   const [tone, setTone] = useState(50);
   const [aggression, setAggression] = useState(30);
@@ -118,7 +121,8 @@ export default function AIBrain() {
     if (!configQ.data) return;
     const d = configQ.data;
     if (d.model) setModel(d.model);
-    if (d.temperature !== undefined) setTemperature(d.temperature);
+    if (d.chat_temperature !== undefined) setTemperature(d.chat_temperature);
+    if (d.post_temperature !== undefined) setPostTemperature(d.post_temperature);
     if (d.safety_level) setSafetyLevel(d.safety_level);
     if (d.tone_assertiveness !== undefined) setTone(d.tone_assertiveness);
     if (d.tone_humor !== undefined) setHumor(d.tone_humor);
@@ -153,7 +157,8 @@ export default function AIBrain() {
   const saveConfigMut = useMutation({
     mutationFn: () => updateAIConfig(cfg, {
       model,
-      temperature,
+      chat_temperature: temperature,
+      post_temperature: postTemperature,
       safety_level: safetyLevel,
       tone_assertiveness: tone,
       tone_humor: humor,
