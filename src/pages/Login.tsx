@@ -43,13 +43,18 @@ export default function Login() {
     setError(null);
     setStep('validating');
     
-    // Check if Supabase is actually configured. If not, and we are in a dev/preview environment,
-    // bypass the actual auth call to avoid hanging on a placeholder URL.
+    // Dev mode bypass — only when Supabase is NOT configured AND we're on localhost
     if (!isSupabaseConfigured()) {
-      console.warn('[Kanyoza] Dev mode — bypassing Supabase auth.');
-      setStep('success');
-      setTimeout(() => login(), 600);
-      return;
+      const isLocal = window.location.hostname === 'localhost' || 
+                     window.location.hostname.includes('127.0.0.1') ||
+                     window.location.hostname.includes('preview');
+      if (isLocal) {
+        console.warn('[Kanyoza] Dev mode — bypassing Supabase auth.');
+        localStorage.setItem('kanyoza_authenticated', 'true');
+        setStep('success');
+        setTimeout(() => login(), 600);
+        return;
+      }
     }
         
     try {
@@ -59,20 +64,29 @@ export default function Login() {
       });
 
       if (authError) {
+        // Network error — only bypass on localhost, never in production
         if (authError.message === 'Failed to fetch' || authError.message.includes('Failed to fetch')) {
-          console.warn('[Kanyoza] Failed to connect to auth server — bypassing auth for preview mode.');
-          setStep('success');
-          setTimeout(() => login(), 600);
-          return;
+          const isLocal = window.location.hostname === 'localhost' || 
+                         window.location.hostname.includes('127.0.0.1');
+          if (isLocal) {
+            console.warn('[Kanyoza] Auth server unreachable — bypassing for local dev.');
+            localStorage.setItem('kanyoza_authenticated', 'true');
+            setStep('success');
+            setTimeout(() => login(), 600);
+            return;
+          }
+          setError('Authentication server unreachable. Please try again.');
+        } else {
+          setError(authError.message);
         }
-
-        setError(authError.message);
         setStep('error');
         setIsShake(true);
         setTimeout(() => setIsShake(false), 500);
         return;
       }
       
+      // Real Supabase auth succeeded
+      localStorage.setItem('kanyoza_authenticated', 'true');
       setStep('success');
       setTimeout(() => login(), 600);
     } catch (err: any) {
@@ -237,11 +251,7 @@ export default function Login() {
                   type="button" 
                   className="text-[10px] text-brand-primary/70 hover:text-brand-primary transition-colors font-semibold tracking-wider"
                   tabIndex={-1}
-                  onClick={() => useStore.getState().triggerNotification({
-                    title: 'Protocol Reset Sent',
-                    subtitle: `A reset protocol has been dispatched to ${email || 'your registered email'}.`,
-                    type: 'alert'
-                  })}>
+                >
                   Reset Protocol?
                 </button>
               </div>
