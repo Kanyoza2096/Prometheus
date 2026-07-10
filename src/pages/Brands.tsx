@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStore } from '../store/useStore';
-import { Palette, Plus, Trash2, Edit2, AlertTriangle, X, RefreshCw, CheckCircle } from 'lucide-react';
+import { Palette, Plus, Trash2, Edit2, AlertTriangle, X, RefreshCw, CheckCircle, Bot } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface Brand {
@@ -12,6 +12,14 @@ interface Brand {
   language?: string;
   audience?: string;
   workspace_id?: string;
+  ai_profile_id?: string;
+}
+
+interface AIProfile {
+  id: string;
+  name: string;
+  tone?: string;
+  expertise?: string;
 }
 
 export default function Brands() {
@@ -22,6 +30,7 @@ export default function Brands() {
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [aiProfiles, setAiProfiles] = useState<AIProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -29,7 +38,7 @@ export default function Brands() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Brand | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Brand | null>(null);
-  const [form, setForm] = useState({ name: '', tone: '', hashtags: '', language: '', audience: '' });
+  const [form, setForm] = useState({ name: '', tone: '', hashtags: '', language: '', audience: '', ai_profile_id: '' });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -64,14 +73,29 @@ export default function Brands() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchWorkspaces(); }, [restEndpoint]);
-  useEffect(() => { fetchBrands(); }, [restEndpoint, selectedWorkspaceId]);
+  const fetchAiProfiles = async () => {
+    if (!selectedWorkspaceId) return;
+    try {
+      const res = await fetch(`${base}/workspaces/${selectedWorkspaceId}/ai-profiles`, { headers });
+      if (res.ok) {
+        const d = await res.json();
+        setAiProfiles(d.ai_profiles || []);
+      }
+    } catch {}
+  };
 
-  const resetForm = () => { setForm({ name: '', tone: '', hashtags: '', language: '', audience: '' }); setEditing(null); setShowForm(false); };
+  useEffect(() => { fetchWorkspaces(); }, [restEndpoint]);
+  useEffect(() => { fetchBrands(); fetchAiProfiles(); }, [restEndpoint, selectedWorkspaceId]);
+
+  const resetForm = () => { setForm({ name: '', tone: '', hashtags: '', language: '', audience: '', ai_profile_id: '' }); setEditing(null); setShowForm(false); };
 
   const openEdit = (b: Brand) => {
     setEditing(b);
-    setForm({ name: b.name, tone: b.tone || '', hashtags: b.hashtags || '', language: b.language || '', audience: b.audience || '' });
+    setForm({ 
+      name: b.name, tone: b.tone || '', hashtags: b.hashtags || '', 
+      language: b.language || '', audience: b.audience || '', 
+      ai_profile_id: b.ai_profile_id || '' 
+    });
     setShowForm(true);
   };
 
@@ -80,7 +104,11 @@ export default function Brands() {
     if (!form.name.trim()) { showToast('Brand name is required', false); return; }
     setSaving(true);
     try {
-      const payload = { ...form, hashtags: form.hashtags ? form.hashtags.split(',').map(t => t.trim()).filter(Boolean) : [] };
+      const payload = { 
+        ...form, 
+        hashtags: form.hashtags ? form.hashtags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        ai_profile_id: form.ai_profile_id || null,
+      };
       const url = editing ? `${base}/brands/${editing.id}` : `${base}/workspaces/${selectedWorkspaceId}/brands`;
       const method = editing ? 'PUT' : 'POST';
       const res = await fetch(url, { method, headers, body: JSON.stringify(payload) });
@@ -159,6 +187,18 @@ export default function Brands() {
               <div><label className="block text-[10px] font-mono font-bold uppercase text-brand-text-muted mb-1">Language</label><input value={form.language} onChange={e => setForm(f => ({ ...f, language: e.target.value }))} placeholder="e.g. English" className="w-full px-3 py-2 bg-brand-elevated border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary" /></div>
               <div><label className="block text-[10px] font-mono font-bold uppercase text-brand-text-muted mb-1">Audience</label><input value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} placeholder="e.g. Young professionals" className="w-full px-3 py-2 bg-brand-elevated border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary" /></div>
               <div className="md:col-span-2"><label className="block text-[10px] font-mono font-bold uppercase text-brand-text-muted mb-1">Hashtags</label><input value={form.hashtags} onChange={e => setForm(f => ({ ...f, hashtags: e.target.value }))} placeholder="#brand #marketing" className="w-full px-3 py-2 bg-brand-elevated border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary" /></div>
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-mono font-bold uppercase text-brand-text-muted mb-1 flex items-center gap-1.5">
+                  <Bot className="w-3.5 h-3.5" /> AI Profile
+                </label>
+                <select value={form.ai_profile_id} onChange={e => setForm(f => ({ ...f, ai_profile_id: e.target.value }))}
+                  className="w-full px-3 py-2.5 bg-brand-elevated border border-brand-border rounded-xl text-sm text-brand-text focus:outline-none focus:border-brand-primary">
+                  <option value="">None (use workspace default)</option>
+                  {aiProfiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}{p.tone ? ` (${p.tone})` : ''}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={resetForm} className="px-4 py-2 bg-brand-surface hover:bg-brand-elevated border border-brand-border text-brand-text-muted rounded-xl text-sm font-semibold">Cancel</button>
@@ -187,6 +227,11 @@ export default function Brands() {
               <div className="flex flex-wrap gap-2 mb-4">
                 {b.tone && <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase bg-brand-elevated text-brand-text-muted">{b.tone}</span>}
                 {b.language && <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase bg-brand-elevated text-brand-text-muted">{b.language}</span>}
+                {b.ai_profile_id && (
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase bg-brand-primary/10 text-brand-primary flex items-center gap-1">
+                    <Bot className="w-3 h-3" /> AI Linked
+                  </span>
+                )}
               </div>
               {b.audience && <p className="text-xs text-brand-text-muted mb-4">Audience: {b.audience}</p>}
               <div className="flex justify-end gap-2 pt-3 border-t border-brand-border">
