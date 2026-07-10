@@ -61,14 +61,25 @@ export default function App() {
   const logout = useStore(state => state.logout);
 
   useEffect(() => {
-    // Restore session on load
+    // Restore session on load — check Supabase first, then fallback to localStorage
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) login();
+      if (session) {
+        login();
+      } else if (localStorage.getItem('kanyoza_authenticated') === 'true') {
+        // Survived refresh or Render restart without Supabase session — keep logged in
+        login();
+      }
     });
 
     // Keep auth state in sync with Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) { login(); } else { logout(); }
+      if (session) {
+        login();
+        localStorage.setItem('kanyoza_authenticated', 'true');
+      } else {
+        logout();
+        localStorage.removeItem('kanyoza_authenticated');
+      }
     });
 
     return () => subscription.unsubscribe();
