@@ -81,7 +81,8 @@ export default function Security() {
   const logs: AuditLogEntry[]         = auditQuery.data?.logs ?? [];
   const services: SystemHealthEntry[] = healthQuery.data?.services ?? [];
   const scanHistory: ScanHistoryEntry[] = scanHistQuery.data?.scans ?? [];
-  const connectors                    = connectorsQ.data?.connectors ?? [];
+  // ConnectorInfo.supported_connectors is string[] — map to display objects
+  const connectors: Array<{ name: string; status: string }> = (connectorsQ.data?.supported_connectors ?? []).map(name => ({ name, status: 'connected' }));
 
   const filteredLogs = logs.filter(l => {
     const actionMatch = !auditActionFilter || (l.action || '').toLowerCase().includes(auditActionFilter.toLowerCase());
@@ -114,7 +115,7 @@ export default function Security() {
           <p className="text-brand-text-muted text-sm font-mono mt-1">GUARDIAN THREAT DETECTION & AUDIT TRAIL</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={refetchAll} className="p-2.5 bg-brand-elevated rounded-xl hover:bg-brand-border/50 transition-colors border border-brand-border">
+          <button aria-label="Refresh security data" onClick={refetchAll} className="p-2.5 bg-brand-elevated rounded-xl hover:bg-brand-border/50 transition-colors border border-brand-border">
             <RefreshCw className={cn('w-4 h-4', (statusQuery.isFetching || healthQuery.isFetching) && 'animate-spin')} />
           </button>
           <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}

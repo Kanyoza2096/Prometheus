@@ -182,7 +182,7 @@ export default function AIBrain() {
   const savePersonaDirectMut = useMutation({
     mutationFn: () => updatePersonaDirect(cfg, { tone, aggression, humor, model, system_prompt: systemPrompt }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['persona-direct', restEndpoint] }),
-    onError: () => { /* silent — /persona is secondary */ },
+    onError: (err: Error) => showToast(err?.message || '/persona sync failed — primary save succeeded.', 'error'),
   });
 
   interface ResetPersonaResponse {
@@ -257,7 +257,7 @@ export default function AIBrain() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => { configQ.refetch(); personaQ.refetch(); }}
+            onClick={() => { configQ.refetch(); personaQ.refetch(); personaDirectQ.refetch(); }}
             className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-colors"
           >
             <RefreshCw className={cn('w-4 h-4', (configQ.isFetching || personaQ.isFetching) && 'animate-spin')} />

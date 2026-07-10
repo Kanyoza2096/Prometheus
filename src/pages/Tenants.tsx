@@ -26,6 +26,7 @@ export default function Tenants() {
     queryKey: ['workspaces', restEndpoint],
     queryFn: () => fetchWorkspaces(cfg),
     retry: 1,
+    staleTime: 60_000,
   });
   const workspaces: Workspace[] = data?.workspaces ?? [];
 
@@ -101,7 +102,7 @@ export default function Tenants() {
                 <p className="text-[10px] font-mono text-brand-text-muted mt-0.5">Currently: {activeTenant.name} ({activeTenant.plan})</p>
               )}
             </div>
-            <button onClick={() => tenantsRefetch()} className="p-2 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text">
+            <button aria-label="Refresh tenants" onClick={() => tenantsRefetch()} className="p-2 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text">
               <RefreshCw className={cn('w-3.5 h-3.5', tenantsLoading && 'animate-spin')} />
             </button>
           </div>
@@ -242,10 +243,10 @@ export default function Tenants() {
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2 pt-1">
-                <button onClick={() => openEdit(ws)} className="p-1.5 hover:bg-brand-elevated rounded text-brand-text-muted hover:text-brand-text transition-colors border border-transparent hover:border-brand-border">
+                <button aria-label={`Edit ${ws.name}`} onClick={() => openEdit(ws)} className="p-1.5 hover:bg-brand-elevated rounded text-brand-text-muted hover:text-brand-text transition-colors border border-transparent hover:border-brand-border">
                   <Edit2 className="w-4 h-4" />
                 </button>
-                <button onClick={() => setConfirmDelete(ws)} className="p-1.5 hover:bg-brand-danger/20 rounded text-brand-text-muted hover:text-brand-danger transition-colors border border-transparent">
+                <button aria-label={`Delete ${ws.name}`} onClick={() => setConfirmDelete(ws)} className="p-1.5 hover:bg-brand-danger/20 rounded text-brand-text-muted hover:text-brand-danger transition-colors border border-transparent">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

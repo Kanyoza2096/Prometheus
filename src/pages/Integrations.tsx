@@ -43,7 +43,8 @@ export default function Integrations() {
     retry: 1,
     staleTime: 60_000,
   });
-  const connectors = connData?.connectors ?? [];
+  // ConnectorInfo returns supported_connectors as string[] — map to display objects
+  const connectors: Array<{ name: string; status: string }> = (connData?.supported_connectors ?? []).map(name => ({ name, status: 'connected' }));
 
   // ── Social Accounts ────────────────────────────────────────────────────────
   const { data, isLoading, isError, refetch } = useQuery({
@@ -51,6 +52,7 @@ export default function Integrations() {
     queryFn:  () => fetchSocialAccounts(cfg, workspaceId as string | number),
     enabled: !!workspaceId,
     retry: 1,
+    staleTime: 60_000,
   });
   const accounts: SocialAccount[] = data?.accounts ?? [];
 
@@ -110,8 +112,8 @@ export default function Integrations() {
               {integrations.map((int, i) => (
                 <div key={int.id ?? i} className="bg-brand-elevated border border-brand-border rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={cn('w-2 h-2 rounded-full shrink-0', int.enabled ? 'bg-brand-success' : 'bg-brand-text-muted')} />
-                    <div className="text-xs font-bold text-brand-text truncate">{int.name ?? int.type ?? `Integration ${i + 1}`}</div>
+                    <span className={cn('w-2 h-2 rounded-full shrink-0', int.connected ? 'bg-brand-success' : 'bg-brand-text-muted')} />
+                    <div className="text-xs font-bold text-brand-text truncate">{int.name ?? int.category ?? `Integration ${i + 1}`}</div>
                   </div>
                   {int.status && <div className="text-[9px] font-mono text-brand-text-muted">{int.status}</div>}
                 </div>
@@ -154,7 +156,7 @@ export default function Integrations() {
           <p className="text-brand-text-muted text-sm font-mono mt-1">CONNECTED PLATFORM ACCOUNTS</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => refetch()} className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text">
+          <button aria-label="Refresh social accounts" onClick={() => refetch()} className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text">
             <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
           </button>
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
@@ -180,7 +182,7 @@ export default function Integrations() {
           >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-brand-text">{editing ? 'Edit Account' : 'Connect New Account'}</h3>
-              <button type="button" onClick={resetForm}><X className="w-4 h-4 text-brand-text-muted" /></button>
+              <button type="button" aria-label="Close form" onClick={resetForm}><X className="w-4 h-4 text-brand-text-muted" /></button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>

@@ -31,6 +31,8 @@ export default function KnowledgeBase() {
     queryKey: ['brands', restEndpoint, workspaceId],
     queryFn: () => fetchBrands(cfg, workspaceId as string | number),
     enabled: !!workspaceId,
+    retry: 1,
+    staleTime: 120_000,
   });
   const brands: Brand[] = brandData?.brands ?? [];
   useEffect(() => { if (!brandId && brands.length > 0) setBrandId(brands[0].id); }, [brands, brandId, setBrandId]);
@@ -41,6 +43,7 @@ export default function KnowledgeBase() {
     queryFn: () => fetchKnowledgeDocs(cfg, brandId as string | number),
     enabled: !!brandId && activeTab === 'brand',
     retry: 1,
+    staleTime: 60_000,
   });
   const documents: KnowledgeDoc[] = data?.documents ?? [];
 
@@ -50,6 +53,7 @@ export default function KnowledgeBase() {
     queryFn: () => fetchAllKnowledge(cfg),
     enabled: activeTab === 'global',
     retry: 1,
+    staleTime: 60_000,
   });
   const globalDocs: KnowledgeDoc[] = globalData?.documents ?? [];
 

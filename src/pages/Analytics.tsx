@@ -79,7 +79,15 @@ export default function Analytics() {
   const perfMessages = perfQ.data?.messages ?? [];
   const topPosts     = postsQ.data?.posts   ?? [];
   const tokenByDay   = tokenQ.data?.by_day  ?? [];
-  const metricsData  = (metricsQ.data?.metrics ?? []) as Array<{ name: string; value: number }>;
+  // MetricPoint = { t: number (unix ms), v: number } — show latest value per series
+  const metricsData: Array<{ name: string; value: number; unit: string }> = metricsQ.data
+    ? [
+        { name: 'CPU',        value: metricsQ.data.cpu?.slice(-1)[0]?.v        ?? 0, unit: '%'   },
+        { name: 'Memory',     value: metricsQ.data.memory?.slice(-1)[0]?.v     ?? 0, unit: '%'   },
+        { name: 'RPS',        value: metricsQ.data.rps?.slice(-1)[0]?.v        ?? 0, unit: 'r/s' },
+        { name: 'Error Rate', value: metricsQ.data.error_rate?.slice(-1)[0]?.v ?? 0, unit: '%'   },
+      ]
+    : [];
 
   // Build heatmap grid: normalise whatever shape the API returns
   const heatGrid: number[][] = (() => {
@@ -92,7 +100,7 @@ export default function Analytics() {
   const heatMax = Math.max(1, ...heatGrid.flat());
 
   const summaryLoading = summaryQ.isLoading;
-  const anyError = summaryQ.isError && perfQ.isError;
+  const anyError = summaryQ.isError || perfQ.isError || postsQ.isError || tokenQ.isError || heatmapQ.isError;
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 pb-24">
@@ -106,6 +114,7 @@ export default function Analytics() {
           <p className="text-brand-text-muted text-sm font-mono mt-1">PERFORMANCE INTELLIGENCE</p>
         </div>
         <button
+          aria-label="Refresh analytics data"
           onClick={refetchAll}
           className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-colors self-start"
         >
@@ -303,9 +312,9 @@ export default function Analytics() {
             <Activity className="w-4 h-4 text-brand-accent" /> System Metrics
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {metricsData.slice(0, 12).map((m, i) => (
+            {metricsData.map((m, i) => (
               <div key={i} className="bg-brand-elevated rounded-xl p-3 border border-brand-border">
-                <div className="text-xs font-bold text-brand-text truncate">{String(m.value ?? '—')}</div>
+                <div className="text-xs font-bold text-brand-text">{m.value.toFixed(1)}<span className="text-[9px] text-brand-text-muted ml-0.5">{m.unit}</span></div>
                 <div className="text-[9px] font-mono text-brand-text-muted truncate mt-0.5">{m.name}</div>
               </div>
             ))}

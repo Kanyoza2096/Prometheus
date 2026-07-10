@@ -94,6 +94,7 @@ export default function Notifications() {
             </button>
           )}
           <button
+            aria-label="Refresh notifications"
             onClick={() => refetch()}
             className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-colors"
           >

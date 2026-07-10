@@ -21,6 +21,7 @@ export default function Features() {
     queryKey: ['features', restEndpoint],
     queryFn: () => fetchFeatures(cfg),
     retry: 1,
+    staleTime: 60_000,
   });
   const features = data?.features ?? {};
   const entries = Object.entries(features);
@@ -77,7 +78,7 @@ export default function Features() {
             </h1>
             <p className="text-brand-text-muted text-sm font-mono mt-1">SYSTEM-WIDE FEATURE FLAGS</p>
           </div>
-          <button onClick={() => refetch()} className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-colors">
+          <button aria-label="Refresh feature flags" onClick={() => refetch()} className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-colors">
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
@@ -148,7 +149,7 @@ export default function Features() {
             </h2>
             <p className="text-brand-text-muted text-sm font-mono mt-1">API RATE LIMIT STATUS & CONTROLS</p>
           </div>
-          <button onClick={() => rlRefetch()} className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-colors">
+          <button aria-label="Refresh rate limits" onClick={() => rlRefetch()} className="p-2.5 bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-colors">
             <RefreshCw className={cn('w-4 h-4', rlLoading && 'animate-spin')} />
           </button>
         </div>
