@@ -36,6 +36,13 @@ interface SocialAccount {
 interface Workspace { id: string; name: string; slug?: string; }
 interface Brand { id: string; name: string; }
 
+interface VerifyResult {
+  ready_to_publish: boolean;
+  summary: string;
+  checks: Record<string, { ok: boolean; detail: string }>;
+  checked_at: string;
+}
+
 const PLATFORM_COLORS: Record<string, { text: string; bg: string; border: string; accent: string }> = {
   facebook: { text: 'text-[#1877F2]', bg: 'bg-[#1877F2]/10', border: 'border-[#1877F2]/20', accent: '#1877F2' },
   twitter: { text: 'text-zinc-200', bg: 'bg-zinc-800/80', border: 'border-zinc-700', accent: '#1DA1F2' },
@@ -88,7 +95,7 @@ const PLATFORM_ICONS: Record<string, React.ElementType> = {
 };
 
 export default function SocialAccounts() {
-  const { restEndpoint, masterToken } = useStore();
+  const { restEndpoint, masterToken, socket } = useStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -110,6 +117,10 @@ export default function SocialAccounts() {
   const [modalBrandId, setModalBrandId] = useState('');
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>({});
+
+  // ─── Verify Publish State ───────────────────────────────────
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [verifyResults, setVerifyResults] = useState<Record<string, VerifyResult>>({});
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -159,6 +170,32 @@ export default function SocialAccounts() {
   }, [restEndpoint, selectedWorkspaceId]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // ─── WebSocket Listener for Async Verification Results ──────
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleVerifyResult = (data: {
+      account_id: string;
+      ready_to_publish: boolean;
+      summary: string;
+      checks: Record<string, { ok: boolean; detail: string }>;
+    }) => {
+      setVerifyResults(prev => ({
+        ...prev,
+        [data.account_id]: {
+          ready_to_publish: data.ready_to_publish,
+          summary: data.summary,
+          checks: data.checks,
+          checked_at: new Date().toISOString(),
+        },
+      }));
+      setVerifyingId(null);
+    };
+
+    socket.on('verify_publish_result', handleVerifyResult);
+    return () => { socket.off('verify_publish_result', handleVerifyResult); };
+  }, [socket]);
 
   const openNew = () => {
     setEditingAccount(null); setModalPlatform('facebook'); setModalAccountName('');
@@ -217,11 +254,58 @@ export default function SocialAccounts() {
     finally { setTestingId(null); }
   };
 
+  // ─── Verify Publish Handler ─────────────────────────────────
+  const handleVerifyPublish = async (account: SocialAccount) => {
+    setVerifyingId(account.id);
+    try {
+      const res = await apiFetch<{
+        ok: boolean;
+        verified: boolean;
+        page_name?: string;
+        summary: string;
+        ready_to_publish: boolean;
+        checks: Record<string, { ok: boolean; detail: string }>;
+      }>(`/social-accounts/${account.id}/verify-publish`, {
+        method: 'POST',
+        signal: AbortSignal.timeout(8000),
+      });
+
+      setVerifyResults(prev => ({
+        ...prev,
+        [account.id]: {
+          ready_to_publish: res.ready_to_publish,
+          summary: res.summary,
+          checks: res.checks,
+          checked_at: new Date().toISOString(),
+        },
+      }));
+
+      showToast(
+        res.ready_to_publish ? 'success' : 'error',
+        `${account.account_name}: ${res.summary}`
+      );
+    } catch (err: any) {
+      if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+        showToast('error', 'Verification timed out. Retry or check backend logs.');
+      } else {
+        showToast('error', err.message || 'Verification failed');
+      }
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirmDelete) return;
     try {
       await apiFetch(`/social-accounts/${confirmDelete.id}`, { method: 'DELETE' });
       showToast('success', 'Account disconnected');
+      // Clean up stored verify result
+      setVerifyResults(prev => {
+        const next = { ...prev };
+        delete next[confirmDelete.id];
+        return next;
+      });
       setConfirmDelete(null);
       loadData();
     } catch (err: any) { showToast('error', err.message || 'Delete failed'); }
@@ -302,6 +386,7 @@ export default function SocialAccounts() {
               const Icon = PLATFORM_ICONS[account.platform];
               const colors = PLATFORM_COLORS[account.platform];
               const linkedBrand = getLinkedBrandName(account.brand_id);
+              const verifyResult = verifyResults[account.id];
               return (
                 <motion.div key={account.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
                   className={cn("bg-brand-surface border border-brand-border rounded-2xl p-6 hover:border-brand-primary/30 transition-all", !account.enabled && "opacity-60")}>
@@ -324,6 +409,44 @@ export default function SocialAccounts() {
                     <div className="flex justify-between"><span className="uppercase text-[10px]">Checked:</span><span className="text-brand-text">{account.last_checked ? new Date(account.last_checked).toLocaleTimeString() : 'Never'}</span></div>
                     <div className="flex justify-between"><span className="uppercase text-[10px]">Auth:</span><span className="text-brand-text">****</span></div>
                   </div>
+
+                  {/* ─── Persistent Verification Status ───────────────── */}
+                  {verifyResult && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className={cn(
+                        "mt-4 p-3 rounded-xl border text-xs font-mono space-y-1.5",
+                        verifyResult.ready_to_publish
+                          ? "bg-brand-success/5 border-brand-success/20"
+                          : "bg-brand-danger/5 border-brand-danger/20"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className={cn(
+                          "font-bold uppercase tracking-wider",
+                          verifyResult.ready_to_publish ? "text-brand-success" : "text-brand-danger"
+                        )}>
+                          {verifyResult.ready_to_publish ? '✅ Publish Ready' : '❌ Needs Attention'}
+                        </p>
+                        <span className="text-[10px] text-brand-text-muted">
+                          {new Date(verifyResult.checked_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-brand-text-muted text-[11px]">{verifyResult.summary}</p>
+                      <div className="space-y-1 pt-1">
+                        {Object.entries(verifyResult.checks).map(([key, check]) => (
+                          <div key={key} className="flex items-start gap-2">
+                            <span className={cn("mt-0.5", check.ok ? 'text-brand-success' : 'text-brand-danger')}>
+                              {check.ok ? '✓' : '✗'}
+                            </span>
+                            <span className="text-brand-text-muted">{check.detail}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
                   <div className="pt-6 mt-6 border-t border-brand-border/50 space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-mono uppercase font-bold text-brand-text-muted">Publishing</span>
@@ -332,7 +455,21 @@ export default function SocialAccounts() {
                       </button>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleHealthCheck(account)} disabled={testingId === account.id} className="flex-1 py-2 text-xs font-mono font-bold uppercase bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-all flex items-center justify-center gap-1.5">
+                      {/* ─── Verify Button ──────────────────────────── */}
+                      <button
+                        onClick={() => handleVerifyPublish(account)}
+                        disabled={verifyingId === account.id}
+                        className="flex-1 py-2 text-xs font-mono font-bold uppercase bg-brand-primary/10 border border-brand-primary/30 rounded-xl text-brand-primary hover:bg-brand-primary/20 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Verify token validity, page access, and publish permissions without posting"
+                      >
+                        {verifyingId === account.id ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        )}
+                        {verifyingId === account.id ? 'Checking' : 'Verify'}
+                      </button>
+                      <button onClick={() => handleHealthCheck(account)} disabled={testingId === account.id} className="flex-1 py-2 text-xs font-mono font-bold uppercase bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-all flex items-center justify-center gap-1.5 disabled:opacity-50">
                         <RefreshCw className={cn("w-3.5 h-3.5", testingId === account.id && "animate-spin text-brand-primary")} /> Test
                       </button>
                       <button onClick={() => openEdit(account)} className="flex-1 py-2 text-xs font-mono font-bold uppercase bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-all flex items-center justify-center gap-1.5">
