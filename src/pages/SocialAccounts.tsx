@@ -30,6 +30,7 @@ interface SocialAccount {
   person_urn?: string;
   phone_number_id?: string;
   bot_token?: string;
+  platform_config?: Record<string, any>;
   created_at?: string;
 }
 
@@ -94,6 +95,14 @@ const PLATFORM_ICONS: Record<string, React.ElementType> = {
   instagram: Instagram, whatsapp: MessageCircle, telegram: Send,
 };
 
+// Helper to extract credential value from account (top-level field or platform_config)
+function getCredential(account: SocialAccount, key: string): string {
+  const topLevel = (account as any)[key];
+  if (topLevel) return topLevel;
+  const pc = account.platform_config || {};
+  return pc[key] || '';
+}
+
 export default function SocialAccounts() {
   const { restEndpoint, masterToken, socket } = useStore();
   const [loading, setLoading] = useState(true);
@@ -118,7 +127,6 @@ export default function SocialAccounts() {
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>({});
 
-  // ─── Verify Publish State ───────────────────────────────────
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [verifyResults, setVerifyResults] = useState<Record<string, VerifyResult>>({});
 
@@ -127,7 +135,6 @@ export default function SocialAccounts() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const headers = masterToken ? { 'Content-Type': 'application/json', Authorization: `Bearer ${masterToken}` } : {};
   const base = restEndpoint.replace(/\/+$/, '');
 
   const apiFetch = async <T = any>(path: string, options: RequestInit = {}): Promise<T> => {
@@ -171,28 +178,12 @@ export default function SocialAccounts() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ─── WebSocket Listener for Async Verification Results ──────
   useEffect(() => {
     if (!socket) return;
-
-    const handleVerifyResult = (data: {
-      account_id: string;
-      ready_to_publish: boolean;
-      summary: string;
-      checks: Record<string, { ok: boolean; detail: string }>;
-    }) => {
-      setVerifyResults(prev => ({
-        ...prev,
-        [data.account_id]: {
-          ready_to_publish: data.ready_to_publish,
-          summary: data.summary,
-          checks: data.checks,
-          checked_at: new Date().toISOString(),
-        },
-      }));
+    const handleVerifyResult = (data: { account_id: string; ready_to_publish: boolean; summary: string; checks: Record<string, { ok: boolean; detail: string }> }) => {
+      setVerifyResults(prev => ({ ...prev, [data.account_id]: { ready_to_publish: data.ready_to_publish, summary: data.summary, checks: data.checks, checked_at: new Date().toISOString() } }));
       setVerifyingId(null);
     };
-
     socket.on('verify_publish_result', handleVerifyResult);
     return () => { socket.off('verify_publish_result', handleVerifyResult); };
   }, [socket]);
@@ -204,12 +195,20 @@ export default function SocialAccounts() {
   };
 
   const openEdit = (account: SocialAccount) => {
-    setEditingAccount(account); setModalPlatform(account.platform);
-    setModalAccountName(account.account_name); setModalTimezone(account.timezone);
-    setModalEnabled(account.enabled); setModalBrandId(account.brand_id || '');
+    setEditingAccount(account);
+    setModalPlatform(account.platform);
+    setModalAccountName(account.account_name);
+    setModalTimezone(account.timezone);
+    setModalEnabled(account.enabled);
+    setModalBrandId(account.brand_id || '');
     const creds: Record<string, string> = {};
-    for (const field of PLATFORM_FIELDS[account.platform]) creds[field.key] = (account as any)[field.key] || '';
-    setCredentials(creds); setVisibleFields({}); setTestResult(null); setIsModalOpen(true);
+    for (const field of PLATFORM_FIELDS[account.platform]) {
+      creds[field.key] = getCredential(account, field.key);
+    }
+    setCredentials(creds);
+    setVisibleFields({});
+    setTestResult(null);
+    setIsModalOpen(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -237,7 +236,15 @@ export default function SocialAccounts() {
 
   const handleToggle = async (account: SocialAccount) => {
     try {
-      const payload = { platform: account.platform, account_name: account.account_name, timezone: account.timezone, enabled: !account.enabled, brand_id: account.brand_id, ...Object.fromEntries(PLATFORM_FIELDS[account.platform].map(f => [f.key, (account as any)[f.key] || ''])) };
+      const creds: Record<string, string> = {};
+      for (const field of PLATFORM_FIELDS[account.platform]) {
+        creds[field.key] = getCredential(account, field.key);
+      }
+      const payload = { 
+        platform: account.platform, account_name: account.account_name, 
+        timezone: account.timezone, enabled: !account.enabled, 
+        brand_id: account.brand_id, ...creds 
+      };
       await apiFetch(`/social-accounts/${account.id}`, { method: 'PUT', body: JSON.stringify(payload) });
       showToast('success', account.enabled ? 'Account disabled' : 'Account enabled');
       loadData();
@@ -254,45 +261,19 @@ export default function SocialAccounts() {
     finally { setTestingId(null); }
   };
 
-  // ─── Verify Publish Handler ─────────────────────────────────
   const handleVerifyPublish = async (account: SocialAccount) => {
     setVerifyingId(account.id);
     try {
-      const res = await apiFetch<{
-        ok: boolean;
-        verified: boolean;
-        page_name?: string;
-        summary: string;
-        ready_to_publish: boolean;
-        checks: Record<string, { ok: boolean; detail: string }>;
-      }>(`/social-accounts/${account.id}/verify-publish`, {
-        method: 'POST',
-        signal: AbortSignal.timeout(8000),
-      });
-
-      setVerifyResults(prev => ({
-        ...prev,
-        [account.id]: {
-          ready_to_publish: res.ready_to_publish,
-          summary: res.summary,
-          checks: res.checks,
-          checked_at: new Date().toISOString(),
-        },
-      }));
-
-      showToast(
-        res.ready_to_publish ? 'success' : 'error',
-        `${account.account_name}: ${res.summary}`
-      );
+      const res = await apiFetch<{ ok: boolean; verified: boolean; page_name?: string; summary: string; ready_to_publish: boolean; checks: Record<string, { ok: boolean; detail: string }> }>(`/social-accounts/${account.id}/verify-publish`, { method: 'POST', signal: AbortSignal.timeout(8000) });
+      setVerifyResults(prev => ({ ...prev, [account.id]: { ready_to_publish: res.ready_to_publish, summary: res.summary, checks: res.checks, checked_at: new Date().toISOString() } }));
+      showToast(res.ready_to_publish ? 'success' : 'error', `${account.account_name}: ${res.summary}`);
     } catch (err: any) {
       if (err.name === 'TimeoutError' || err.name === 'AbortError') {
         showToast('error', 'Verification timed out. Retry or check backend logs.');
       } else {
         showToast('error', err.message || 'Verification failed');
       }
-    } finally {
-      setVerifyingId(null);
-    }
+    } finally { setVerifyingId(null); }
   };
 
   const handleDelete = async () => {
@@ -300,12 +281,7 @@ export default function SocialAccounts() {
     try {
       await apiFetch(`/social-accounts/${confirmDelete.id}`, { method: 'DELETE' });
       showToast('success', 'Account disconnected');
-      // Clean up stored verify result
-      setVerifyResults(prev => {
-        const next = { ...prev };
-        delete next[confirmDelete.id];
-        return next;
-      });
+      setVerifyResults(prev => { const next = { ...prev }; delete next[confirmDelete.id]; return next; });
       setConfirmDelete(null);
       loadData();
     } catch (err: any) { showToast('error', err.message || 'Delete failed'); }
@@ -410,36 +386,20 @@ export default function SocialAccounts() {
                     <div className="flex justify-between"><span className="uppercase text-[10px]">Auth:</span><span className="text-brand-text">****</span></div>
                   </div>
 
-                  {/* ─── Persistent Verification Status ───────────────── */}
                   {verifyResult && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className={cn(
-                        "mt-4 p-3 rounded-xl border text-xs font-mono space-y-1.5",
-                        verifyResult.ready_to_publish
-                          ? "bg-brand-success/5 border-brand-success/20"
-                          : "bg-brand-danger/5 border-brand-danger/20"
-                      )}
-                    >
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                      className={cn("mt-4 p-3 rounded-xl border text-xs font-mono space-y-1.5", verifyResult.ready_to_publish ? "bg-brand-success/5 border-brand-success/20" : "bg-brand-danger/5 border-brand-danger/20")}>
                       <div className="flex items-center justify-between">
-                        <p className={cn(
-                          "font-bold uppercase tracking-wider",
-                          verifyResult.ready_to_publish ? "text-brand-success" : "text-brand-danger"
-                        )}>
+                        <p className={cn("font-bold uppercase tracking-wider", verifyResult.ready_to_publish ? "text-brand-success" : "text-brand-danger")}>
                           {verifyResult.ready_to_publish ? '✅ Publish Ready' : '❌ Needs Attention'}
                         </p>
-                        <span className="text-[10px] text-brand-text-muted">
-                          {new Date(verifyResult.checked_at).toLocaleTimeString()}
-                        </span>
+                        <span className="text-[10px] text-brand-text-muted">{new Date(verifyResult.checked_at).toLocaleTimeString()}</span>
                       </div>
                       <p className="text-brand-text-muted text-[11px]">{verifyResult.summary}</p>
                       <div className="space-y-1 pt-1">
                         {Object.entries(verifyResult.checks).map(([key, check]) => (
                           <div key={key} className="flex items-start gap-2">
-                            <span className={cn("mt-0.5", check.ok ? 'text-brand-success' : 'text-brand-danger')}>
-                              {check.ok ? '✓' : '✗'}
-                            </span>
+                            <span className={cn("mt-0.5", check.ok ? 'text-brand-success' : 'text-brand-danger')}>{check.ok ? '✓' : '✗'}</span>
                             <span className="text-brand-text-muted">{check.detail}</span>
                           </div>
                         ))}
@@ -455,18 +415,9 @@ export default function SocialAccounts() {
                       </button>
                     </div>
                     <div className="flex gap-2">
-                      {/* ─── Verify Button ──────────────────────────── */}
-                      <button
-                        onClick={() => handleVerifyPublish(account)}
-                        disabled={verifyingId === account.id}
-                        className="flex-1 py-2 text-xs font-mono font-bold uppercase bg-brand-primary/10 border border-brand-primary/30 rounded-xl text-brand-primary hover:bg-brand-primary/20 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Verify token validity, page access, and publish permissions without posting"
-                      >
-                        {verifyingId === account.id ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <CheckCircle className="w-3.5 h-3.5" />
-                        )}
+                      <button onClick={() => handleVerifyPublish(account)} disabled={verifyingId === account.id}
+                        className="flex-1 py-2 text-xs font-mono font-bold uppercase bg-brand-primary/10 border border-brand-primary/30 rounded-xl text-brand-primary hover:bg-brand-primary/20 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {verifyingId === account.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                         {verifyingId === account.id ? 'Checking' : 'Verify'}
                       </button>
                       <button onClick={() => handleHealthCheck(account)} disabled={testingId === account.id} className="flex-1 py-2 text-xs font-mono font-bold uppercase bg-brand-elevated border border-brand-border rounded-xl text-brand-text-muted hover:text-brand-text transition-all flex items-center justify-center gap-1.5 disabled:opacity-50">
