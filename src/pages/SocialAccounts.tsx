@@ -4,7 +4,8 @@ import { useStore } from '../store/useStore';
 import { 
   Link, Plus, Trash2, RefreshCw, CheckCircle, XCircle, 
   AlertTriangle, Eye, EyeOff, Globe, Copy, Settings,
-  Facebook, Twitter, Linkedin, Instagram, MessageCircle, Send 
+  Facebook, Twitter, Linkedin, Instagram, MessageCircle, Send,
+  Palette, Bot
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -17,6 +18,7 @@ interface SocialAccount {
   enabled: boolean;
   health_status: string;
   last_checked: string | null;
+  brand_id?: string;
   access_token?: string;
   refresh_token?: string;
   client_id?: string;
@@ -31,11 +33,8 @@ interface SocialAccount {
   created_at?: string;
 }
 
-interface Workspace {
-  id: string;
-  name: string;
-  slug?: string;
-}
+interface Workspace { id: string; name: string; slug?: string; }
+interface Brand { id: string; name: string; }
 
 const PLATFORM_COLORS: Record<string, { text: string; bg: string; border: string; accent: string }> = {
   facebook: { text: 'text-[#1877F2]', bg: 'bg-[#1877F2]/10', border: 'border-[#1877F2]/20', accent: '#1877F2' },
@@ -95,6 +94,7 @@ export default function SocialAccounts() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<SocialAccount | null>(null);
@@ -107,6 +107,7 @@ export default function SocialAccounts() {
   const [modalAccountName, setModalAccountName] = useState('');
   const [modalTimezone, setModalTimezone] = useState('Africa/Blantyre');
   const [modalEnabled, setModalEnabled] = useState(true);
+  const [modalBrandId, setModalBrandId] = useState('');
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>({});
 
@@ -140,10 +141,15 @@ export default function SocialAccounts() {
       if (wsList.length > 0) {
         const activeId = selectedWorkspaceId && wsList.find(w => w.id === selectedWorkspaceId) ? selectedWorkspaceId : wsList[0].id;
         setSelectedWorkspaceId(activeId);
-        const accRes = await apiFetch<{ ok: boolean; social_accounts: SocialAccount[] }>(`/workspaces/${activeId}/social-accounts`);
+        const [accRes, brRes] = await Promise.all([
+          apiFetch<{ ok: boolean; social_accounts: SocialAccount[] }>(`/workspaces/${activeId}/social-accounts`),
+          apiFetch<{ ok: boolean; brands: Brand[] }>(`/workspaces/${activeId}/brands`),
+        ]);
         setAccounts(accRes.social_accounts || []);
+        setBrands(brRes.brands || []);
       } else {
         setAccounts([]);
+        setBrands([]);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
@@ -156,14 +162,14 @@ export default function SocialAccounts() {
 
   const openNew = () => {
     setEditingAccount(null); setModalPlatform('facebook'); setModalAccountName('');
-    setModalTimezone('Africa/Blantyre'); setModalEnabled(true); setCredentials({});
-    setVisibleFields({}); setTestResult(null); setIsModalOpen(true);
+    setModalTimezone('Africa/Blantyre'); setModalEnabled(true); setModalBrandId('');
+    setCredentials({}); setVisibleFields({}); setTestResult(null); setIsModalOpen(true);
   };
 
   const openEdit = (account: SocialAccount) => {
     setEditingAccount(account); setModalPlatform(account.platform);
     setModalAccountName(account.account_name); setModalTimezone(account.timezone);
-    setModalEnabled(account.enabled);
+    setModalEnabled(account.enabled); setModalBrandId(account.brand_id || '');
     const creds: Record<string, string> = {};
     for (const field of PLATFORM_FIELDS[account.platform]) creds[field.key] = (account as any)[field.key] || '';
     setCredentials(creds); setVisibleFields({}); setTestResult(null); setIsModalOpen(true);
@@ -174,7 +180,12 @@ export default function SocialAccounts() {
     if (!modalAccountName.trim()) { showToast('error', 'Account name is required'); return; }
     setSaving(true);
     try {
-      const payload = { platform: modalPlatform, account_name: modalAccountName.trim(), timezone: modalTimezone, enabled: modalEnabled, ...credentials };
+      const payload = { 
+        platform: modalPlatform, account_name: modalAccountName.trim(), 
+        timezone: modalTimezone, enabled: modalEnabled,
+        brand_id: modalBrandId || null,
+        ...credentials 
+      };
       if (editingAccount) {
         await apiFetch(`/social-accounts/${editingAccount.id}`, { method: 'PUT', body: JSON.stringify(payload) });
       } else {
@@ -189,7 +200,7 @@ export default function SocialAccounts() {
 
   const handleToggle = async (account: SocialAccount) => {
     try {
-      const payload = { platform: account.platform, account_name: account.account_name, timezone: account.timezone, enabled: !account.enabled, ...Object.fromEntries(PLATFORM_FIELDS[account.platform].map(f => [f.key, (account as any)[f.key] || ''])) };
+      const payload = { platform: account.platform, account_name: account.account_name, timezone: account.timezone, enabled: !account.enabled, brand_id: account.brand_id, ...Object.fromEntries(PLATFORM_FIELDS[account.platform].map(f => [f.key, (account as any)[f.key] || ''])) };
       await apiFetch(`/social-accounts/${account.id}`, { method: 'PUT', body: JSON.stringify(payload) });
       showToast('success', account.enabled ? 'Account disabled' : 'Account enabled');
       loadData();
@@ -228,6 +239,7 @@ export default function SocialAccounts() {
   };
 
   const workspaceAccounts = accounts.filter(a => a.workspace_id === selectedWorkspaceId);
+  const getLinkedBrandName = (brandId?: string) => brands.find(b => b.id === brandId)?.name;
 
   return (
     <div className="relative pb-24 min-h-[calc(100vh-80px)] px-4 md:px-8 pt-6">
@@ -235,8 +247,7 @@ export default function SocialAccounts() {
         {toast && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
             className={cn("fixed top-20 right-6 z-50 px-5 py-3 rounded-xl border text-sm font-bold font-mono shadow-lg", toast.type === 'success' ? "bg-brand-success/10 text-brand-success border-brand-success/30" : "bg-brand-danger/10 text-brand-danger border-brand-danger/30")}>
-            {toast.type === 'success' ? <CheckCircle className="w-4 h-4 inline mr-2" /> : <AlertTriangle className="w-4 h-4 inline mr-2" />}
-            {toast.message}
+            {toast.type === 'success' ? <CheckCircle className="w-4 h-4 inline mr-2" /> : <AlertTriangle className="w-4 h-4 inline mr-2" />}{toast.message}
           </motion.div>
         )}
       </AnimatePresence>
@@ -290,6 +301,7 @@ export default function SocialAccounts() {
             {workspaceAccounts.map(account => {
               const Icon = PLATFORM_ICONS[account.platform];
               const colors = PLATFORM_COLORS[account.platform];
+              const linkedBrand = getLinkedBrandName(account.brand_id);
               return (
                 <motion.div key={account.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
                   className={cn("bg-brand-surface border border-brand-border rounded-2xl p-6 hover:border-brand-primary/30 transition-all", !account.enabled && "opacity-60")}>
@@ -301,7 +313,12 @@ export default function SocialAccounts() {
                       (!account.health_status || account.health_status === 'unknown') && "bg-brand-border text-brand-text-muted")}>{account.health_status || 'Unknown'}</span>
                   </div>
                   <h3 className="font-bold text-lg text-brand-text truncate">{account.account_name}</h3>
-                  <p className="text-xs text-brand-text-muted font-bold font-mono uppercase mb-4">{PLATFORM_LABELS[account.platform]}</p>
+                  <p className="text-xs text-brand-text-muted font-bold font-mono uppercase mb-1">{PLATFORM_LABELS[account.platform]}</p>
+                  {linkedBrand && (
+                    <p className="text-xs text-brand-primary font-mono flex items-center gap-1 mb-3">
+                      <Palette className="w-3 h-3" /> {linkedBrand}
+                    </p>
+                  )}
                   <div className="space-y-2 pt-4 border-t border-brand-border/50 text-xs font-mono text-brand-text-muted">
                     <div className="flex justify-between"><span className="uppercase text-[10px]">Timezone:</span><span className="text-brand-text font-bold">{account.timezone}</span></div>
                     <div className="flex justify-between"><span className="uppercase text-[10px]">Checked:</span><span className="text-brand-text">{account.last_checked ? new Date(account.last_checked).toLocaleTimeString() : 'Never'}</span></div>
@@ -376,15 +393,23 @@ export default function SocialAccounts() {
                       {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
                     </select>
                   </div>
-                  <div className="flex flex-col justify-end">
-                    <div className="flex items-center justify-between p-2.5 bg-brand-elevated border border-brand-border rounded-xl">
-                      <span className="text-xs font-mono font-bold text-brand-text-muted uppercase">Publishing Enabled</span>
-                      <button type="button" onClick={() => setModalEnabled(!modalEnabled)}
-                        className={cn("w-11 h-6 rounded-full flex items-center px-1 transition-all border", modalEnabled ? "bg-brand-primary border-brand-primary justify-end" : "bg-brand-surface border-brand-border justify-start")}>
-                        <motion.div layout className="w-4 h-4 bg-white rounded-full shadow" />
-                      </button>
-                    </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-brand-text-muted mb-1.5 flex items-center gap-1.5">
+                      <Palette className="w-3.5 h-3.5" /> Linked Brand
+                    </label>
+                    <select value={modalBrandId} onChange={e => setModalBrandId(e.target.value)}
+                      className="w-full bg-brand-elevated border border-brand-border rounded-xl px-4 py-2.5 text-xs text-brand-text focus:outline-none focus:border-brand-primary cursor-pointer">
+                      <option value="">None (unassigned)</option>
+                      {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
                   </div>
+                </div>
+                <div className="flex items-center justify-between p-2.5 bg-brand-elevated border border-brand-border rounded-xl">
+                  <span className="text-xs font-mono font-bold text-brand-text-muted uppercase">Publishing Enabled</span>
+                  <button type="button" onClick={() => setModalEnabled(!modalEnabled)}
+                    className={cn("w-11 h-6 rounded-full flex items-center px-1 transition-all border", modalEnabled ? "bg-brand-primary border-brand-primary justify-end" : "bg-brand-surface border-brand-border justify-start")}>
+                    <motion.div layout className="w-4 h-4 bg-white rounded-full shadow" />
+                  </button>
                 </div>
                 <div className="pt-4 border-t border-brand-border/60">
                   <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-primary mb-4">API Credentials</h3>
