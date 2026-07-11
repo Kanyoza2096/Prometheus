@@ -92,7 +92,7 @@ export default function Brands() {
   const openEdit = (b: Brand) => {
     setEditing(b);
     setForm({ 
-      name: b.name, tone: b.tone || '', hashtags: b.hashtags || '', 
+      name: b.name, tone: b.tone || '',  hashtags: Array.isArray(b.hashtags) ? b.hashtags.join(', ') : (b.hashtags || ''),
       language: b.language || '', audience: b.audience || '', 
       ai_profile_id: b.ai_profile_id || '' 
     });
