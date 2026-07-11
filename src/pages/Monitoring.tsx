@@ -3,11 +3,250 @@ import { motion } from 'motion/react';
 import { 
   Activity, Server, Cpu, Database, Network, HardDrive, 
   PlaySquare, StopCircle, RefreshCw, Zap, Clock, Terminal, AlertTriangle,
-  ListTodo, Pause, Play, Search, X
+  ListTodo, Pause, Play, Search, X, MessageCircle, Send,
+  Globe, Shield
 } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA FLOW VISUALIZER
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface FlowNode {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  x: number;
+  y: number;
+  status: 'online' | 'degraded' | 'offline' | 'active';
+  pulseCount: number;
+}
+
+interface FlowEdge {
+  from: string;
+  to: string;
+  packets: { id: string; progress: number; opacity: number }[];
+}
+
+const NODE_LAYOUT: Omit<FlowNode, 'status' | 'pulseCount'>[] = [
+  { id: 'gemini',     label: 'Gemini AI',        icon: Cpu,            x: 50,  y: 5 },
+  { id: 'pipeline',   label: 'Content Pipeline',  icon: Zap,            x: 50,  y: 22 },
+  { id: 'render',     label: 'Render Queue',      icon: Activity,       x: 85,  y: 22 },
+  { id: 'command',    label: 'Command Executor',   icon: MessageCircle, x: 15,  y: 40 },
+  { id: 'scheduler',  label: 'Post Scheduler',     icon: Send,          x: 50,  y: 40 },
+  { id: 'browser',    label: 'Browser Manager',    icon: Globe,         x: 85,  y: 40 },
+  { id: 'connectors', label: 'Connectors',         icon: Server,        x: 50,  y: 58 },
+  { id: 'supabase',   label: 'Supabase',           icon: Database,      x: 30,  y: 76 },
+  { id: 'redis',      label: 'Upstash Redis',      icon: Database,      x: 70,  y: 76 },
+  { id: 'socketio',   label: 'Socket.IO',          icon: Activity,      x: 50,  y: 92 },
+];
+
+const EDGES: [string, string][] = [
+  ['gemini', 'pipeline'],
+  ['pipeline', 'render'],
+  ['pipeline', 'scheduler'],
+  ['gemini', 'command'],
+  ['command', 'connectors'],
+  ['scheduler', 'connectors'],
+  ['render', 'browser'],
+  ['browser', 'connectors'],
+  ['connectors', 'supabase'],
+  ['connectors', 'redis'],
+  ['supabase', 'socketio'],
+  ['redis', 'socketio'],
+];
+
+const STATUS_COLORS: Record<string, string> = {
+  online: '#22c55e',
+  degraded: '#f59e0b',
+  offline: '#ef4444',
+  active: '#3b82f6',
+};
+
+function DataFlowVisualizer() {
+  const { socket, healthMatrix, stats } = useStore();
+  const [nodes, setNodes] = useState<FlowNode[]>([]);
+  const [edges, setEdges] = useState<FlowEdge[]>([]);
+  const [eventsPerSec, setEventsPerSec] = useState(0);
+  const [totalEvents, setTotalEvents] = useState(0);
+  const packetIdRef = useRef(0);
+
+  useEffect(() => {
+    setNodes(NODE_LAYOUT.map(n => ({ ...n, status: 'offline', pulseCount: 0 })));
+    setEdges(EDGES.map(([from, to]) => ({ from, to, packets: [] })));
+  }, []);
+
+  useEffect(() => {
+    setNodes(prev => prev.map(node => {
+      const health = healthMatrix.find(h => 
+        h.id === node.id || 
+        h.name?.toLowerCase().includes(node.id) ||
+        (node.id === 'supabase' && h.id === 'supabase') ||
+        (node.id === 'redis' && h.id === 'redis')
+      );
+      const status = health 
+        ? (health.status === 'online' ? 'online' : health.status === 'degraded' ? 'degraded' : 'offline')
+        : node.status;
+      return { ...node, status };
+    }));
+  }, [healthMatrix]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const spawnPacket = () => {
+      const edgeIndex = Math.floor(Math.random() * EDGES.length);
+      const [from, to] = EDGES[edgeIndex];
+      setEdges(prev => prev.map(edge => {
+        if (edge.from === from && edge.to === to) {
+          const newPacket = { id: `pkt_${packetIdRef.current++}`, progress: 0, opacity: 0.8 };
+          return { ...edge, packets: [...edge.packets.slice(-3), newPacket] };
+        }
+        return edge;
+      }));
+    };
+
+    const handlers = ['new_message', 'post_published', 'api_payload', 'scan_complete', 'stats'];
+    handlers.forEach(event => {
+      socket.on(event, () => {
+        spawnPacket();
+        setTotalEvents(prev => prev + 1);
+      });
+    });
+
+    const interval = setInterval(() => {
+      setEdges(prev => prev.map(edge => ({
+        ...edge,
+        packets: edge.packets
+          .map(p => ({ ...p, progress: p.progress + 0.03, opacity: p.opacity - 0.01 }))
+          .filter(p => p.progress < 1 && p.opacity > 0),
+      })));
+    }, 50);
+
+    const epsInterval = setInterval(() => {
+      setEventsPerSec(prev => {
+        const diff = totalEvents - ((window as any).__lastTotal || 0);
+        (window as any).__lastTotal = totalEvents;
+        return diff;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(epsInterval);
+    };
+  }, [socket, totalEvents]);
+
+  const getNodeStatus = (node: FlowNode) => {
+    if (node.id === 'connectors' && stats.apiCalls > 0) return 'active';
+    if (node.id === 'scheduler' && stats.postsPublished > 0) return 'active';
+    if (node.id === 'socketio' && eventsPerSec > 0) return 'active';
+    return node.status;
+  };
+
+  return (
+    <div className="relative w-full h-[400px] bg-brand-surface border border-brand-border rounded-2xl overflow-hidden">
+      <div 
+        className="absolute inset-0 opacity-5"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #6366f1 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      />
+
+      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        {edges.map(edge => {
+          const fromNode = nodes.find(n => n.id === edge.from);
+          const toNode = nodes.find(n => n.id === edge.to);
+          if (!fromNode || !toNode) return null;
+          return (
+            <g key={`${edge.from}-${edge.to}`}>
+              <line x1={`${fromNode.x}%`} y1={`${fromNode.y}%`} x2={`${toNode.x}%`} y2={`${toNode.y}%`} stroke="#374151" strokeWidth="1" />
+              {edge.packets.map(pkt => (
+                <motion.circle
+                  key={pkt.id} r="3" fill="#6366f1" opacity={pkt.opacity}
+                  animate={{ cx: [`${fromNode.x}%`, `${toNode.x}%`], cy: [`${fromNode.y}%`, `${toNode.y}%`] }}
+                  transition={{ duration: 0.6, ease: 'linear' }}
+                />
+              ))}
+            </g>
+          );
+        })}
+      </svg>
+
+      {nodes.map(node => {
+        const Icon = node.icon;
+        const status = getNodeStatus(node);
+        const color = STATUS_COLORS[status];
+        return (
+          <motion.div
+            key={node.id}
+            className="absolute flex flex-col items-center gap-0.5"
+            style={{ left: `${node.x}%`, top: `${node.y}%`, transform: 'translate(-50%, -50%)' }}
+            animate={{ scale: status === 'active' ? [1, 1.05, 1] : 1 }}
+            transition={{ duration: 2, repeat: status === 'active' ? Infinity : 0 }}
+          >
+            {status === 'active' && (
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{ border: `2px solid ${color}` }}
+                animate={{ scale: [1, 1.8], opacity: [0.6, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+            )}
+            <motion.div
+              className="p-2 rounded-lg cursor-pointer hover:scale-110 transition-transform"
+              style={{ backgroundColor: `${color}20`, border: `1px solid ${color}40` }}
+              whileHover={{ scale: 1.15 }}
+              title={`${node.label}: ${status}`}
+            >
+              <Icon className="w-4 h-4" style={{ color }} />
+            </motion.div>
+            <span className="text-[8px] font-mono font-bold uppercase text-brand-text-muted text-center leading-tight max-w-[55px]">
+              {node.label}
+            </span>
+            <motion.div
+              className="w-1 h-1 rounded-full"
+              style={{ backgroundColor: color }}
+              animate={{ opacity: status === 'active' ? [1, 0.4, 1] : 1 }}
+              transition={{ duration: 1, repeat: Infinity }}
+            />
+          </motion.div>
+        );
+      })}
+
+      <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center bg-brand-elevated/90 backdrop-blur-sm border border-brand-border rounded-lg px-3 py-1.5">
+        <div className="flex items-center gap-4 text-[10px] font-mono">
+          <div className="flex items-center gap-1.5">
+            <Activity className="w-3 h-3 text-brand-primary" />
+            <span className="text-brand-text-muted">Events/s:</span>
+            <span className="text-brand-primary font-bold">{eventsPerSec}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-brand-success" />
+            <span className="text-brand-text-muted">Total:</span>
+            <span className="text-brand-success font-bold">{totalEvents.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Shield className="w-3 h-3 text-brand-warning" />
+            <span className="text-brand-text-muted">Queue:</span>
+            <span className="text-brand-warning font-bold">{Math.max(0, stats.apiCalls - stats.postsPublished)}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-[9px] font-mono text-brand-text-muted uppercase">Live Topology</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GAUGE COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
 
 const Gauge = ({ value, label, color, icon: Icon, suffix = '' }: any) => {
   const radius = 36;
@@ -42,15 +281,6 @@ const LEVEL_COLORS: Record<string, string> = {
   CRITICAL: '#7c3aed',
 };
 
-const LEVEL_BG: Record<string, string> = {
-  DEBUG: 'bg-gray-500/10',
-  INFO: 'bg-brand-primary/10',
-  WARNING: 'bg-brand-warning/10',
-  WARN: 'bg-brand-warning/10',
-  ERROR: 'bg-brand-danger/10',
-  CRITICAL: 'bg-purple-500/10',
-};
-
 const LEVEL_BORDER: Record<string, string> = {
   DEBUG: 'border-gray-500/30',
   INFO: 'border-brand-primary/30',
@@ -59,6 +289,10 @@ const LEVEL_BORDER: Record<string, string> = {
   ERROR: 'border-brand-danger/30',
   CRITICAL: 'border-purple-500/30',
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MONITORING PAGE
+// ═══════════════════════════════════════════════════════════════════════════
 
 export default function Monitoring() {
   const { 
@@ -82,7 +316,6 @@ export default function Monitoring() {
 
   const headers = masterToken ? { Authorization: `Bearer ${masterToken}` } : {};
 
-  // Fetch real resource metrics every 5 seconds
   useEffect(() => {
     const fetchResources = async () => {
       try {
@@ -99,7 +332,6 @@ export default function Monitoring() {
     return () => clearInterval(id);
   }, [restEndpoint]);
 
-  // Fetch log stats every 30 seconds
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -115,7 +347,6 @@ export default function Monitoring() {
     return () => clearInterval(id);
   }, [restEndpoint]);
 
-  // SSE log stream with REST fallback
   useEffect(() => {
     const params = new URLSearchParams();
     if (filter.level) params.append('level', filter.level);
@@ -123,9 +354,7 @@ export default function Monitoring() {
     const url = `${restEndpoint.replace(/\/+$/, '')}/logs/stream?${params}`;
     const es = new EventSource(url);
 
-    es.onopen = () => {
-      setConnectionMode('sse');
-    };
+    es.onopen = () => setConnectionMode('sse');
 
     es.onmessage = (event) => {
       try {
@@ -145,7 +374,6 @@ export default function Monitoring() {
 
     eventSourceRef.current = es;
 
-    // REST fallback polling when SSE fails
     const pollInterval = setInterval(async () => {
       if (es.readyState === EventSource.OPEN) return;
       try {
@@ -166,7 +394,6 @@ export default function Monitoring() {
     };
   }, [restEndpoint, filter.level, paused]);
 
-  // Auto-scroll
   useEffect(() => {
     if (!paused && logsEndRef.current) {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -181,7 +408,6 @@ export default function Monitoring() {
     }
   };
 
-  // Build services from real healthMatrix
   const services = healthMatrix.map(h => ({
     name: h.name,
     status: h.status,
@@ -191,11 +417,8 @@ export default function Monitoring() {
   }));
 
   const formatTime = (ts: string) => {
-    try {
-      return new Date(ts).toLocaleTimeString('en-US', { hour12: false });
-    } catch {
-      return ts || '';
-    }
+    try { return new Date(ts).toLocaleTimeString('en-US', { hour12: false }); }
+    catch { return ts || ''; }
   };
 
   const filteredEvents = filter.search
@@ -205,7 +428,6 @@ export default function Monitoring() {
       )
     : events;
 
-  // Real gauge data from resource metrics
   const gauges = {
     cpu: resources.cpu_percent || 0,
     mem: resources.memory_percent || 0,
@@ -215,7 +437,6 @@ export default function Monitoring() {
     queue: resources.queue_depth || 0,
   };
 
-  // Latency sparkline data from store
   const chartData = latencyHistory.length > 0 
     ? latencyHistory.map((v, i) => ({ time: i, latency: v }))
     : [];
@@ -236,7 +457,6 @@ export default function Monitoring() {
           <p className="text-brand-text-muted text-sm font-mono mt-1">INFRASTRUCTURE TELEMETRY</p>
         </div>
         <div className="flex items-center gap-4">
-          {/* Log stats */}
           <div className="hidden md:flex gap-3 text-xs font-mono">
             <span className="text-red-400">🔴 {logStats.errors || stats?.guardianIssues || 0}</span>
             <span className="text-amber-400">🟡 {logStats.warnings || 0}</span>
@@ -258,7 +478,7 @@ export default function Monitoring() {
         </div>
       </div>
 
-      {/* Row 1: Gauges from real resource metrics */}
+      {/* Row 1: Gauges */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Gauge value={gauges.cpu} label="CPU Usage" color="#4F46E5" icon={Cpu} suffix="%" />
         <Gauge value={gauges.mem} label="Memory" color="#06B6D4" icon={Database} suffix="%" />
@@ -267,6 +487,9 @@ export default function Monitoring() {
         <Gauge value={gauges.netOut} label="Net Out" color="#8B5CF6" icon={Network} suffix="MB" />
         <Gauge value={gauges.queue} label="Queue Depth" color="#EF4444" icon={ListTodo} />
       </div>
+
+      {/* Row 1.5: System Data Flow Topology Map */}
+      <DataFlowVisualizer />
 
       {/* Row 2: Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -313,7 +536,7 @@ export default function Monitoring() {
         </div>
       </div>
 
-      {/* Row 3: Services from real healthMatrix */}
+      {/* Row 3: Service Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {services.map((svc, i) => (
           <motion.div
@@ -360,7 +583,7 @@ export default function Monitoring() {
         ))}
       </div>
 
-      {/* Row 4: Live Log Stream from SSE */}
+      {/* Row 4: Live Log Stream */}
       <div className="bg-brand-surface border border-brand-border rounded-2xl overflow-hidden flex flex-col h-[500px]">
         <div className="p-5 border-b border-brand-border flex justify-between items-center flex-wrap gap-3">
           <h3 className="text-sm font-bold uppercase tracking-widest text-brand-text">Live Log Stream</h3>
