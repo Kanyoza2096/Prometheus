@@ -65,6 +65,7 @@ const TENANTS = [
 
 const NAV_ITEMS = [
   { to: '/',                 icon: LayoutDashboard, label: 'Dashboard',      group: 'core' },
+  { to: '/prometheus',       icon: BarChart3,       label: 'Prometheus Metrics', group: 'ops' },
   { to: '/ai-brain',         icon: BrainCircuit,    label: 'AI Brain',        group: 'core' },
   { to: '/workflows',        icon: GitBranch,       label: 'Automation',      group: 'core' },
   { to: '/posts',            icon: FileText,        label: 'Content Studio',  group: 'core' },
@@ -83,7 +84,7 @@ const NAV_ITEMS = [
   { to: '/tenants',          icon: Building2,       label: 'Tenants',         group: 'admin' },
   { to: '/brands',           icon: Palette,         label: 'Brands',          group: 'data' },
   { to: '/ai-profiles',      icon: Bot,             label: 'AI Profiles',     group: 'data' },
-  { to: '/social-accounts', icon: Link, label: 'Social Accounts', group: 'data' },
+  { to: '/social-accounts',  icon: Link,             label: 'Social Accounts', group: 'data' },
   { to: '/features',         icon: ToggleLeft,      label: 'Feature Toggles', group: 'admin' },
   { to: '/monitoring',       icon: Cpu,             label: 'Monitoring',      group: 'admin' },
   { to: '/ai-chat',          icon: MessageCircle,   label: 'AI Chat',         group: 'admin' },
