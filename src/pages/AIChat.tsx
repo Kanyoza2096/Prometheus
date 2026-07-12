@@ -89,8 +89,7 @@ export default function AIChat() {
       if (!masterToken) {
         throw new Error('API token not configured. Go to Settings to set your master token.');
       }
-
-      const res = await fetch(`${base}/ai/chat`, {
+      const res = await fetch(`${base}/api/v1/ai/chat`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ message: userMsg.content }),
