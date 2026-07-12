@@ -71,7 +71,7 @@ export default function MISManager() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${base}/plugins`, { headers });
+        const res = await fetch(`${base}/api/v1/plugins`, { headers });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setPlugins(data.plugins || []);
