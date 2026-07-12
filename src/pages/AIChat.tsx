@@ -429,8 +429,21 @@ export default function AIChat() {
           <span className="text-[9px] font-mono text-brand-text-muted/50">
             {input.length > 0 ? `${input.length} chars` : 'Ready'}
           </span>
+
+          // JSX at the bottom of the component:
+  <span className="text-[9px] font-mono text-brand-text-muted/50">
+  {input.length > 0 ? `${input.length} chars` : 'Ready'}
+</span>
+// ... more JSX closing tags ...
+
+// This is inside the handleSend function (way above):
+} finally {
+  setLoading(false);
+  inputRef.current?.focus();
+          }
         </div>
       </div>
     </div>
   );
 }
+
