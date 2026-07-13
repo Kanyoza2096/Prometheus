@@ -72,7 +72,7 @@ const PLATFORM_FIELDS: Record<string, { key: string; label: string; secret: bool
     { key: 'refresh_token', label: 'Refresh Token', secret: true, placeholder: 'OAuth refresh token' },
     { key: 'client_id', label: 'Client ID', secret: false, placeholder: 'Twitter Client ID' },
     { key: 'client_secret', label: 'Client Secret', secret: true, placeholder: 'Twitter Client Secret' },
-  ],
+],
   linkedin: [
     { key: 'access_token', label: 'Access Token', secret: true, placeholder: 'LinkedIn access token' },
     { key: 'person_urn', label: 'Person URN', secret: false, placeholder: 'urn:li:person:XXXXX' },
