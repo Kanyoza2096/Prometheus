@@ -138,9 +138,10 @@ export default function SocialAccounts() {
   const base = restEndpoint.replace(/\/+$/, '');
 
   const apiFetch = async <T = any>(path: string, options: RequestInit = {}): Promise<T> => {
+    const token = masterToken || localStorage.getItem('master_token') || '';
     const res = await fetch(`${base}${path}`, {
       ...options,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${masterToken}`, ...(options.headers ?? {}) },
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers ?? {}) },
     });
     if (!res.ok) {
       const body = await res.text().catch(() => res.statusText);
